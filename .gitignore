@@ -1,0 +1,15 @@
+# terraform
+*.tfvars
+*.tfstate*
+.terraform
+
+# vscode
+.vscode
+
+# project specific
+*.log
+*.zip
+_ci/user.json
+
+# macOS
+*.DS_Store
