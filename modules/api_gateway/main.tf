@@ -13,10 +13,8 @@ data "template_file" "api_gw_trust" {
 
 data "aws_iam_policy_document" "api_gw" {
   statement {
-    actions = [
-      "lambda:InvokeFunction"
-    ]
-    resources = var.lambda_function_arns
+    actions = ["sqs:*"]
+    resources = ["*"]
   }
 }
 
@@ -48,43 +46,11 @@ resource "aws_api_gateway_rest_api" "api" {
   description = "API for managing LDAP maintenance tasks"
 }
 
-# resource "aws_api_gateway_resource" "approve" {
-#   rest_api_id = "${aws_api_gateway_rest_api.api.id}"
-#   parent_id   = "${aws_api_gateway_rest_api.api.root_resource_id}"
-#   path_part   = "approve"
-# }
-
-# resource "aws_api_gateway_resource" "deny" {
-#   rest_api_id = "${aws_api_gateway_rest_api.api.id}"
-#   parent_id   = "${aws_api_gateway_rest_api.api.root_resource_id}"
-#   path_part   = "deny"
-# }
-
 resource "aws_api_gateway_resource" "event_listener" {
   rest_api_id = "${aws_api_gateway_rest_api.api.id}"
   parent_id   = "${aws_api_gateway_rest_api.api.root_resource_id}"
   path_part   = "event-listener"
 }
-
-# resource "aws_api_gateway_method" "approve_get" {
-#   rest_api_id   = "${aws_api_gateway_rest_api.api.id}"
-#   resource_id   = "${aws_api_gateway_resource.approve.id}"
-#   http_method   = "GET"
-#   authorization = "NONE"
-#   request_parameters = {
-#     "method.request.querystring.taskToken" = true
-#   }
-# }
-
-# resource "aws_api_gateway_method" "deny_get" {
-#   rest_api_id   = "${aws_api_gateway_rest_api.api.id}"
-#   resource_id   = "${aws_api_gateway_resource.deny.id}"
-#   http_method   = "GET"
-#   authorization = "NONE"
-#   request_parameters = {
-#     "method.request.querystring.taskToken" = true
-#   }
-# }
 
 resource "aws_api_gateway_method" "event_listener_post" {
   rest_api_id   = "${aws_api_gateway_rest_api.api.id}"
@@ -93,54 +59,49 @@ resource "aws_api_gateway_method" "event_listener_post" {
   authorization = "NONE"
 }
 
-# resource "aws_api_gateway_integration" "approve" {
-#   rest_api_id             = "${aws_api_gateway_rest_api.api.id}"
-#   resource_id             = "${aws_api_gateway_resource.approve.id}"
-#   http_method             = "${aws_api_gateway_method.approve_get.http_method}"
-#   credentials             = "${aws_iam_role.api_gw.arn}"
-#   integration_http_method = "POST"
-#   type                    = "AWS"
-#   uri                     = "arn:aws:apigateway:${data.aws_region.current.name}:states:action/SendTaskSuccess"
-#   passthrough_behavior    = "WHEN_NO_TEMPLATES"
-#   request_templates = {
-#     "application/json" = <<EOF
-#     {
-#       "output": "\"Approve link was clicked.\"",
-#       "taskToken": "$input.params('taskToken')"
-#     }
-#     EOF
-
-#   }
-# }
-
-# resource "aws_api_gateway_integration" "deny" {
-#   rest_api_id             = "${aws_api_gateway_rest_api.api.id}"
-#   resource_id             = "${aws_api_gateway_resource.deny.id}"
-#   http_method             = "${aws_api_gateway_method.deny_get.http_method}"
-#   credentials             = "${aws_iam_role.api_gw.arn}"
-#   integration_http_method = "POST"
-#   type                    = "AWS"
-#   uri                     = "arn:aws:apigateway:${data.aws_region.current.name}:states:action/SendTaskFailure"
-#   passthrough_behavior    = "WHEN_NO_TEMPLATES"
-#   request_templates = {
-#     "application/json" = <<EOF
-#     {
-#       "cause": "Deny link was clicked.",
-#       "error": "Deny",
-#       "taskToken": "$input.params('taskToken')"
-#     }
-#     EOF
-#   }
-# }
-
 resource "aws_api_gateway_integration" "event_listener" {
-  rest_api_id             = "${aws_api_gateway_rest_api.api.id}"
-  resource_id             = "${aws_api_gateway_resource.event_listener.id}"
-  http_method             = "${aws_api_gateway_method.event_listener_post.http_method}"
-  credentials             = "${aws_iam_role.api_gw.arn}"
+  rest_api_id = "${aws_api_gateway_rest_api.api.id}"
+  resource_id = "${aws_api_gateway_resource.event_listener.id}"
+  http_method = "${aws_api_gateway_method.event_listener_post.http_method}"
+  credentials = "${aws_iam_role.api_gw.arn}"
+  type        = "AWS"
+
   integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = "arn:aws:apigateway:${data.aws_region.current.name}:lambda:path/2015-03-31/functions/${var.slack_event_listener_lambda_arn}"
+  request_parameters = {
+    "integration.request.header.Content-Type" = "'application/x-www-form-urlencoded'"
+  }
+
+  # boilerplate request template
+  request_templates = {
+    "application/json" = <<TEMPLATE
+Action=SendMessage&MessageBody=
+#set($allParams = $input.params())
+{
+"body-json" : $input.json('$'),
+"params" : {
+#foreach($type in $allParams.keySet())
+    #set($params = $allParams.get($type))
+"$type" : {
+    #foreach($paramName in $params.keySet())
+    "$paramName" : "$util.escapeJavaScript($params.get($paramName))"
+        #if($foreach.hasNext),#end
+    #end
+}
+    #if($foreach.hasNext),#end
+#end
+},
+"stage-variables" : {
+#foreach($key in $stageVariables.keySet())
+"$key" : "$util.escapeJavaScript($stageVariables.get($key))"
+    #if($foreach.hasNext),#end
+#end
+}
+}
+TEMPLATE
+  }
+
+  uri = "arn:aws:apigateway:${data.aws_region.current.name}:sqs:path/${data.aws_caller_identity.current.account_id}/${var.slack_event_listener_sqs_queue_name}"
+  passthrough_behavior = "WHEN_NO_TEMPLATES"
 }
 
 resource "aws_api_gateway_method_response" "event_listener_response_200" {

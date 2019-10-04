@@ -5,25 +5,33 @@ variable "tags" {
 }
 
 variable "project_name" {
-  default = "ldap-maintainer"
+  default     = "ldap-maintainer"
   description = "Name of the project"
-  type = string
+  type        = string
 }
 
 variable "slack_event_listener_lambda_arn" {
-  default = ""
+  default     = ""
   description = "Invocation ARN of the slack event listener"
-  type = string
+  type        = string
 }
 
 variable "slack_event_listener_lambda_name" {
-  default = ""
+  default     = ""
   description = "Name of the slack event listener lambda"
-  type = string
+  type        = string
 }
 
 variable "lambda_function_arns" {
-  default = []
+  default     = []
   description = "List of lambda ARNS that the resulting api gateway can invoke"
-  type = list(string)
+  type        = list(string)
+}
+
+variable "slack_event_listener_sqs_arn" {
+  type = string
+}
+
+variable "slack_event_listener_sqs_queue_name" {
+  type = string
 }

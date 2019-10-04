@@ -1,21 +1,51 @@
+resource "aws_sqs_queue" "slack_listener" {
+  name = "${var.project_name}-async-queue"
+  tags = var.tags
+}
+
+# give lambda function the ability to tell sfn if the user
+# clicked approve or deny
 data "aws_iam_policy_document" "lambda" {
   # need to make this less permissive
   statement {
+    sid = "AlertStepFunction"
     actions = [
       "states:*"
     ]
     resources = var.step_function_arns
   }
+
+  statement {
+    sid = "ListenToSQS"
+    actions = [
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes"
+    ]
+    resources = [
+      aws_sqs_queue.slack_listener.arn
+    ]
+  }
 }
 
-resource "aws_lambda_permission" "lambda_permission" {
-  statement_id  = "AllowSlackNotifierInvoke"
-  action        = "lambda:InvokeFunction"
+resource "aws_lambda_event_source_mapping" "sqs" {
+  event_source_arn = aws_sqs_queue.slack_listener.arn
   function_name = module.lambda.function_name
-  principal     = "apigateway.amazonaws.com"
-
-  source_arn = var.slack_listener_api_endpoint_arn
+  batch_size = 1
 }
+
+# terraform seems to be adding a space between the region and account id in the
+# resulting policy which causes creates issues.. manually toggling the 
+# 'Use Lambda Proxy integration' option under the source method's 'Method Integration'
+# settings page fixes this
+# resource "aws_lambda_permission" "lambda_permission" {
+#   statement_id  = "AllowSlackNotifierInvoke"
+#   action        = "lambda:InvokeFunction"
+#   function_name = module.lambda.function_arn
+#   principal     = "apigateway.amazonaws.com"
+
+#   source_arn = var.slack_listener_api_endpoint_arn
+# }
 
 module "lambda" {
   source = "github.com/claranet/terraform-aws-lambda"

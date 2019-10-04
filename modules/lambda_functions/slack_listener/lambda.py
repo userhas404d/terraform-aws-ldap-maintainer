@@ -41,9 +41,6 @@ logging.basicConfig(
     level=LOG_LEVELS[os.environ.get('LOG_LEVEL', '').lower()])
 log = logging.getLogger(__name__)
 
-# stolen largely from:
-# https://chatbotslife.com/write-a-serverless-slack-chat-bot-using-aws-e2d2432c380e
-
 # Grab the Bot OAuth token from the environment.
 BOT_TOKEN = os.environ["SLACK_API_TOKEN"]
 
@@ -74,13 +71,14 @@ def get_slack_payload(req):
 
 def notify_stepfunction(slack_payload):
     """Sends a task token to the step function service"""
+    slack_payload['from_button_click'] = True
     action_id = slack_payload['actions'][0]['action_id']
     task_token = unquote(slack_payload['actions'][0]['value'])
     sfn = boto3.client("stepfunctions")
     if action_id.lower() == "approve":
         sfn.send_task_success(
             taskToken=task_token,
-            output="\"Approve link was clicked.\""
+            output=json.dumps(slack_payload)
         )
     else:
         sfn.send_task_failure(
@@ -88,6 +86,29 @@ def notify_stepfunction(slack_payload):
             error='Denied',
             cause='Action denied'
         )
+
+def validate_user(slack_payload):
+    """Confirm if the user taking the action has the right."""
+    return True
+
+
+def get_slack_response_message(slack_payload):
+    """Builds the slack response message"""
+    action_id = slack_payload['actions'][0]['action_id'].lower()
+    if action_id == "approve":
+        message = "Approve received! ladpmaintainerbot is working hard to fulfill your request"
+    else:
+        message = "Deny received!"
+    return message
+
+
+def notify_slack(slack_payload, message="", validate_actions=True):
+    """Updates the original ldap-maintainer message based on the user's selection."""
+    log.info("Notifying slack..")
+    if validate_actions:
+        message = get_slack_response_message(slack_payload)
+    # notification_url = slack_payload['some']['key']
+    # urllib.get()
 
 
 # borrowed largely from here:
@@ -119,12 +140,25 @@ def verify_token(headers, body, signing_secret):
 
 def handler(event, context):
     log.debug(f"received event: {event}")
+    log.debug(f"received context: {context}")
+
+    # need to create a cloudwatch event that looks for a failed stepfunction call
+    # and update slack accordingly
+    # if context == "what_i_want":
+    #    message = "The LDAP maintenance was task cancelled or encountered an error."
+    #    notify_slack(slack_payload, message, False)
 
     slack_headers = event['multiValueHeaders']
     SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
 
     if verify_token(slack_headers, event['body'], SLACK_SIGNING_SECRET):
-        notify_stepfunction(get_slack_payload(event))
+        slack_payload = get_slack_payload(event)
+        if verify_user(slack_payload):
+            notify_slack(slack_payload)
+            notify_stepfunction(slack_payload)
+        else:
+            message = "Sorry, you must be a member of X group to do that."
+            notify_slack(slack_payload, message, False)
         return get_http_response("200", "Success!")
     else:
         return get_http_response("403", "Message hashes do not match.")

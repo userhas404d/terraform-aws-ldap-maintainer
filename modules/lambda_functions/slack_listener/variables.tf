@@ -37,3 +37,8 @@ variable "tags" {
   description = "Map of tags"
   type        = map(string)
 }
+
+variable "api_gw_role_arn" {
+  default = ""
+  type = string
+}

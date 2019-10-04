@@ -1,9 +1,11 @@
 module "api_gateway" {
   source = "./modules/api_gateway"
 
-  lambda_function_arns             = ["${module.slack_event_listener.function_arn}"]
-  slack_event_listener_lambda_arn  = module.slack_event_listener.function_invoke_arn
-  slack_event_listener_lambda_name = module.slack_event_listener.function_name
+  lambda_function_arns                = ["${module.slack_event_listener.function_arn}"]
+  slack_event_listener_sqs_arn        = module.slack_event_listener.sqs_queue_arn
+  slack_event_listener_sqs_queue_name = module.slack_event_listener.sqs_queue_name
+  slack_event_listener_lambda_arn     = module.slack_event_listener.function_invoke_arn
+  slack_event_listener_lambda_name    = module.slack_event_listener.function_name
 }
 
 module "slack_event_listener" {
@@ -12,6 +14,7 @@ module "slack_event_listener" {
   slack_api_token      = var.slack_api_token
   slack_signing_secret = var.slack_signing_secret
   step_function_arns   = list(aws_sfn_state_machine.ldap_maintenance.id)
+  api_gw_role_arn      = module.api_gateway.api_gw_role_arn
 
   slack_listener_api_endpoint_arn = module.api_gateway.slack_listener_api_endpoint_arn
 
@@ -104,16 +107,16 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
         "Input": {"action": "query"}
       }
     },
-    "Next": "manual_approval"
+    "Next": "wait_for_manual_approval"
     },
-    "manual_approval": {
+    "wait_for_manual_approval": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
       "Parameters": {
             "FunctionName":"${module.manual_step_activity_worker.function_name}",
             "Payload":{  
-               "event.$":"$",
-               "token.$":"$$.Task.Token"
+               "event.$": "$",
+               "token.$": "$$.Task.Token"
             }
       },
       "Next": "run_ldap_query_again"
@@ -124,10 +127,22 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
     "Parameters": {
       "FunctionName": "${module.ldap_query_lambda.function_arn}",
       "Payload": {
-        "Input": {"Action": "RunQuery"}
+        "Input": {"action": "disable"},
+        "event.$": "$"
       }
     },
-    "End": true
+    "Next": "send_status_to_slack"
+    },
+    "send_status_to_slack": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+            "FunctionName":"${module.manual_step_activity_worker.function_name}",
+            "Payload":{
+               "event.$": "$"
+            }
+      },
+     "End": true
     }
   }
 }
