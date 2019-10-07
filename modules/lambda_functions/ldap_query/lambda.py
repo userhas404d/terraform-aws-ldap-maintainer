@@ -288,16 +288,23 @@ def handler(event, context):
     }
     """
     log.debug(f'Received event: {event}')
-    event = event['Input']
-    response = {}
+    if event.get('Input'):
+        event = event['Input']
     if event.get("action"):
         if event['action'] == "query":
-            users = LdapMaintainer().get_stale_users()
-            log.debug(f"Ldap query results: {users}")
-            response['query_results'] = {
-                "totals": get_user_counts(users)
+            # users = LdapMaintainer().get_stale_users()
+            users = {
+                "120": ["user1", "user2", "user3"],
+                "90": ["user1", "user2", "user3"],
+                "60": ["user1", "user2", "user3"],
+                "never": ["user1", "user2", "user3"],
             }
-            response['artifact_urls'] = upload_artifacts(users)
-            return response
+            log.debug(f"Ldap query results: {users}")
+            return {
+                "query_results": {
+                    "totals": get_user_counts(users)
+                },
+                "artifact_urls": upload_artifacts(users)
+                }
         elif event['action'] == "disable":
-            return {}
+            return event

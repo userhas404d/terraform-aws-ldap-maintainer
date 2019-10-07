@@ -64,7 +64,7 @@ data "aws_subnet_ids" "private" {
 }
 
 resource "aws_security_group" "lambda" {
-  name        = "${var.project_name}-ldap-query-sg"
+  name        = "${var.project_name}-ldap-query-sg-${random_string.this.result}"
   description = "SG used by the ${var.project_name}-ldap-query-sg lambda function"
   vpc_id      = var.vpc_id
 
@@ -78,7 +78,7 @@ resource "aws_security_group" "lambda" {
 
 resource "aws_lambda_layer_version" "lambda_layer" {
   filename         = "${path.module}/lambda_layer_payload.zip"
-  layer_name       = "python-ldap"
+  layer_name       = "python-ldap-${random_string.this.result}"
   description      = "Contains python-ldap and its dependencies"
   source_code_hash = "${filebase64sha256("${path.module}/lambda_layer_payload.zip")}"
 
@@ -88,7 +88,7 @@ resource "aws_lambda_layer_version" "lambda_layer" {
 module "lambda" {
   source = "github.com/claranet/terraform-aws-lambda"
 
-  function_name = "ldap-maintainer"
+  function_name = "ldap-maintainer-${random_string.this.result}"
   description   = "Performs ldap query tasks"
   handler       = "lambda.handler"
   runtime       = "python3.7"

@@ -1,6 +1,8 @@
 import collections
+import json
 import logging
 import os
+from botocore.vendored import requests
 from datetime import datetime
 
 import slack
@@ -35,6 +37,9 @@ logging.basicConfig(
     datefmt='%Y-%m-%dT%H:%M:%S',
     level=LOG_LEVELS[os.environ.get('LOG_LEVEL', '').lower()])
 log = logging.getLogger(__name__)
+
+
+SLACK_API_TOKEN = os.environ['SLACK_API_TOKEN']
 
 
 class SlackMessageBuilder:
@@ -170,8 +175,10 @@ class SlackMessageBuilder:
         return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
 
 
-def build_slack_user_message(payload, task_token):
+def build_slack_user_message(event):
     TARGET_CHANNEL = os.environ['SLACK_CHANNEL_ID']
+    task_token = event['token']
+    payload = event['event']['Payload']
     message_body = SlackMessageBuilder(
         channel=TARGET_CHANNEL,
         artifact_urls=payload['artifact_urls'],
@@ -183,25 +190,33 @@ def build_slack_user_message(payload, task_token):
     return message
 
 
-def build_slack_response_message():
-    """"""
-
+def send_slack_response_message(event, message):
+    """Sends a response message to slack."""
+    headers = {
+        'Content-Type': 'application/json; charset=utf-8', 
+        'Authorization': f'Bearer {SLACK_API_TOKEN}'
+    }
+    channel = event['channel']['name']
+    return requests.post(
+        url=event['response_url'],
+        json={"channel": channel, "text": message},
+        headers=headers
+    )
+   
 
 def send_message_to_slack(message):
     """Sends the user status report to slack."""
-    SLACK_API_TOKEN = os.environ['SLACK_API_TOKEN']
     client = slack.WebClient(token=SLACK_API_TOKEN)
     response = client.chat_postMessage(**message)
     assert response["ok"]
 
 
 def handler(event, context):
-    # try catch to get task token,
-    # if tasktoken then pass to slack..
-    log.debug(f"Received event: {event}")
-    task_token = event['token']
-
-    payload = event['event']['Payload']
-    slack_message = build_slack_user_message(payload, task_token)
-    send_message_to_slack(slack_message)
-    return payload
+    log.debug(f"Received event: {json.dumps(event)}")
+    if event.get('message_to_slack'):
+        message = event['message_to_slack']
+        send_slack_response_message(event['event'], message)
+    else:
+        slack_message = build_slack_user_message(event)
+        send_message_to_slack(slack_message)
+    return event 

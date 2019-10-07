@@ -59,21 +59,8 @@ resource "aws_api_gateway_method" "event_listener_post" {
   authorization = "NONE"
 }
 
-resource "aws_api_gateway_integration" "event_listener" {
-  rest_api_id = "${aws_api_gateway_rest_api.api.id}"
-  resource_id = "${aws_api_gateway_resource.event_listener.id}"
-  http_method = "${aws_api_gateway_method.event_listener_post.http_method}"
-  credentials = "${aws_iam_role.api_gw.arn}"
-  type        = "AWS"
-
-  integration_http_method = "POST"
-  request_parameters = {
-    "integration.request.header.Content-Type" = "'application/x-www-form-urlencoded'"
-  }
-
-  # boilerplate request template
-  request_templates = {
-    "application/json" = <<TEMPLATE
+locals {
+  request_template = <<TEMPLATE
 Action=SendMessage&MessageBody=
 #set($allParams = $input.params())
 {
@@ -98,6 +85,24 @@ Action=SendMessage&MessageBody=
 }
 }
 TEMPLATE
+
+}
+
+resource "aws_api_gateway_integration" "event_listener" {
+  rest_api_id = "${aws_api_gateway_rest_api.api.id}"
+  resource_id = "${aws_api_gateway_resource.event_listener.id}"
+  http_method = "${aws_api_gateway_method.event_listener_post.http_method}"
+  credentials = "${aws_iam_role.api_gw.arn}"
+  type        = "AWS"
+
+  integration_http_method = "POST"
+  request_parameters = {
+    "integration.request.header.Content-Type" = "'application/x-www-form-urlencoded'"
+  }
+
+  request_templates = {
+    "application/json" = local.request_template
+    "application/x-www-form-urlencoded" = local.request_template
   }
 
   uri = "arn:aws:apigateway:${data.aws_region.current.name}:sqs:path/${data.aws_caller_identity.current.account_id}/${var.slack_event_listener_sqs_queue_name}"
@@ -108,6 +113,10 @@ resource "aws_api_gateway_method_response" "event_listener_response_200" {
   rest_api_id = "${aws_api_gateway_rest_api.api.id}"
   resource_id = "${aws_api_gateway_resource.event_listener.id}"
   http_method = "${aws_api_gateway_method.event_listener_post.http_method}"
+  response_models = {
+    "application/json" = "Empty"
+    "application/x-www-form-urlencoded" = "Empty"
+  }
   status_code = "200"
 }
 

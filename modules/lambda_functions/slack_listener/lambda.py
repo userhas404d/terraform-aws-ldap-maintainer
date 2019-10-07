@@ -9,7 +9,8 @@ import os
 import hmac
 import hashlib
 import logging
-from urllib.parse import unquote
+import re
+from urllib.parse import quote_plus, unquote
 
 DEFAULT_LOG_LEVEL = logging.DEBUG
 LOG_LEVELS = collections.defaultdict(
@@ -58,57 +59,51 @@ def get_http_response(httpStatusCode, body, headers={}):
         }
 
 
-def get_slack_payload(req):
+def get_slack_payload(event):
     """
     Extract the body data of the slack request.
     """
-
-    if req.get("body"):
-        extracted_data = json.loads(unquote(req['body']).replace("payload=", ""))
-        # log.info(f'Extracted data: {extracted_data}')
-        return extracted_data
+    event_body = event['Records'][0]['body'].replace("\n", "")
+    log.debug(f'event body pre-search: {event_body}')
+    payload = re.search(r'(\"payload=)(.*)(\"\,\"params\" \:)', event_body)
+    params = re.search(r'(\"\,\"params\" \:)(.*)(\,\")', event_body)
+    try:
+        if payload and params:
+            payload = payload.group(2)
+            params = params.group(2)
+            log.debug(f"payload: {payload}")
+            log.debug(f"params: {params}")
+            response = {}
+            response['payload'] = json.loads(payload)
+            response['params'] = json.loads(params)
+            return response
+        else:
+            log.error("Invalid payload received!")
+            exit
+    except IndexError:
+        log.error("Invalid payload received!")
+        exit
+    except json.decoder.JSONDecodeError:
+        log.error("Invalid payload received!")
+        exit
 
 
 def notify_stepfunction(slack_payload):
     """Sends a task token to the step function service"""
-    slack_payload['from_button_click'] = True
-    action_id = slack_payload['actions'][0]['action_id']
+    slack_payload['button_pressed'] = slack_payload['actions'][0]['action_id']
     task_token = unquote(slack_payload['actions'][0]['value'])
     sfn = boto3.client("stepfunctions")
-    if action_id.lower() == "approve":
-        sfn.send_task_success(
-            taskToken=task_token,
-            output=json.dumps(slack_payload)
-        )
-    else:
-        sfn.send_task_failure(
-            taskToken=task_token,
-            error='Denied',
-            cause='Action denied'
-        )
+    log.debug("Sending slack_payload to stepfunctions")
+    response = sfn.send_task_success(
+        taskToken=task_token,
+        output=json.dumps(slack_payload)
+    )
+    log.debug(f"Received response from stepfunctions: {response}")
+
 
 def validate_user(slack_payload):
     """Confirm if the user taking the action has the right."""
     return True
-
-
-def get_slack_response_message(slack_payload):
-    """Builds the slack response message"""
-    action_id = slack_payload['actions'][0]['action_id'].lower()
-    if action_id == "approve":
-        message = "Approve received! ladpmaintainerbot is working hard to fulfill your request"
-    else:
-        message = "Deny received!"
-    return message
-
-
-def notify_slack(slack_payload, message="", validate_actions=True):
-    """Updates the original ldap-maintainer message based on the user's selection."""
-    log.info("Notifying slack..")
-    if validate_actions:
-        message = get_slack_response_message(slack_payload)
-    # notification_url = slack_payload['some']['key']
-    # urllib.get()
 
 
 # borrowed largely from here:
@@ -138,27 +133,31 @@ def verify_token(headers, body, signing_secret):
         return False
 
 
+def get_reserialized_payload(event):
+    for key in event:
+        event[key] = key.encode()
+    return event
+
+
 def handler(event, context):
     log.debug(f"received event: {event}")
-    log.debug(f"received context: {context}")
+    log.debug(f"{get_slack_payload(event)}")
+    event = get_slack_payload(event)
 
-    # need to create a cloudwatch event that looks for a failed stepfunction call
-    # and update slack accordingly
-    # if context == "what_i_want":
-    #    message = "The LDAP maintenance was task cancelled or encountered an error."
-    #    notify_slack(slack_payload, message, False)
-
-    slack_headers = event['multiValueHeaders']
     SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
+    user_id = event['payload']['user']['id']
+    headers = event['params']['header']
 
-    if verify_token(slack_headers, event['body'], SLACK_SIGNING_SECRET):
-        slack_payload = get_slack_payload(event)
-        if verify_user(slack_payload):
-            notify_slack(slack_payload)
-            notify_stepfunction(slack_payload)
-        else:
-            message = "Sorry, you must be a member of X group to do that."
-            notify_slack(slack_payload, message, False)
-        return get_http_response("200", "Success!")
-    else:
-        return get_http_response("403", "Message hashes do not match.")
+    notify_stepfunction(event['payload'])
+
+    # validate the message received from slack and that the user is authorized to take the action
+    # serialized_payload = get_reserialized_payload(event['payload'])
+    # log.debug(f"serialized_payload: {serialized_payload}")
+    # log.debug(f"{verify_token(headers, serialized_payload, SLACK_SIGNING_SECRET)}")
+
+    # if verify_token(slack_headers, event['body'], SLACK_SIGNING_SECRET):
+    #     slack_payload = get_slack_payload(event)
+    #     if verify_user(slack_payload):
+    #         notify_stepfunction(slack_payload)
+    #     else:
+    #         message = "Sorry, you must be a member of X group to do that."

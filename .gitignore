@@ -10,6 +10,7 @@
 *.log
 *.zip
 _ci/user.json
+lambda_async_test/*
 
 # macOS
 *.DS_Store

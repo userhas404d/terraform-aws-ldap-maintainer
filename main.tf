@@ -1,6 +1,7 @@
 module "api_gateway" {
   source = "./modules/api_gateway"
 
+  project_name                        = var.project_name
   lambda_function_arns                = ["${module.slack_event_listener.function_arn}"]
   slack_event_listener_sqs_arn        = module.slack_event_listener.sqs_queue_arn
   slack_event_listener_sqs_queue_name = module.slack_event_listener.sqs_queue_name
@@ -11,6 +12,7 @@ module "api_gateway" {
 module "slack_event_listener" {
   source = "./modules/lambda_functions/slack_listener"
 
+  project_name         = var.project_name
   slack_api_token      = var.slack_api_token
   slack_signing_secret = var.slack_signing_secret
   step_function_arns   = list(aws_sfn_state_machine.ldap_maintenance.id)
@@ -98,6 +100,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
   "Comment": "Ldap account deactivation manager",
   "StartAt": "run_ldap_query",
   "States": {
+
     "run_ldap_query": {
     "Type": "Task",
     "Resource": "arn:aws:states:::lambda:invoke",
@@ -109,41 +112,89 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
     },
     "Next": "wait_for_manual_approval"
     },
+
     "wait_for_manual_approval": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
       "Parameters": {
-            "FunctionName":"${module.manual_step_activity_worker.function_name}",
+            "FunctionName": "${module.manual_step_activity_worker.function_name}",
             "Payload":{  
                "event.$": "$",
                "token.$": "$$.Task.Token"
             }
       },
-      "Next": "run_ldap_query_again"
+      "Next": "check_manual_approval"
     },
+
+    "check_manual_approval": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.button_pressed",
+          "StringEquals": "Approve",
+          "Next": "notify_slack_of_approval"
+        }
+      ],
+      "Default": "notify_slack_of_disapproval"
+    },
+
+    "notify_slack_of_disapproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+            "FunctionName": "${module.manual_step_activity_worker.function_name}",
+            "Payload":{  
+               "event.$": "$",
+               "message_to_slack": "The LDAP operation has been disapproved"
+            }
+      },
+      "Next": "disapproved"
+    },
+
+    "disapproved": {
+      "Type": "Fail",
+      "Cause": "No Matches!"
+    },
+
+    "notify_slack_of_approval": {
+    "Type": "Task",
+    "Resource": "arn:aws:states:::lambda:invoke",
+    "Parameters": {
+      "FunctionName": "${module.manual_step_activity_worker.function_name}",
+      "Payload": {
+        "event.$": "$",
+        "message_to_slack": "The LDAP operation has been approved. I'll notify you when the operation is complete."
+      }
+    },
+    "Next": "run_ldap_query_again"
+    },
+
     "run_ldap_query_again": {
     "Type": "Task",
     "Resource": "arn:aws:states:::lambda:invoke",
     "Parameters": {
       "FunctionName": "${module.ldap_query_lambda.function_arn}",
       "Payload": {
-        "Input": {"action": "disable"},
+        "action": "disable",
         "event.$": "$"
       }
     },
     "Next": "send_status_to_slack"
     },
+
     "send_status_to_slack": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-            "FunctionName":"${module.manual_step_activity_worker.function_name}",
+            "FunctionName": "${module.manual_step_activity_worker.function_name}",
             "Payload":{
-               "event.$": "$"
+               "event.$": "$.Payload.event.Payload.event",
+               "message_to_slack": "LDAP operations are complete"
             }
       },
      "End": true
     }
+
   }
 }
 EOF

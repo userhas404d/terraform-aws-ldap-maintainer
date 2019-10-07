@@ -1,7 +1,13 @@
 
+resource "random_string" "this" {
+  length = 8
+  special = false
+  upper   = false
+}
+
 resource "aws_lambda_layer_version" "lambda_layer" {
   filename         = "${path.module}/lambda_layer_payload.zip"
-  layer_name       = "python-ldap"
+  layer_name       = "python-ldap-${random_string.this.result}"
   description      = "Contains python-ldap and its dependencies"
   source_code_hash = "${filebase64sha256("${path.module}/lambda_layer_payload.zip")}"
 
@@ -11,7 +17,7 @@ resource "aws_lambda_layer_version" "lambda_layer" {
 module "lambda" {
   source = "github.com/claranet/terraform-aws-lambda"
 
-  function_name = "${var.project_name}-slack-notifier"
+  function_name = "${var.project_name}-slack-notifier-${random_string.this.result}"
   description   = "Sends alerts to slack and performs ldap maintenance tasks"
   handler       = "lambda.handler"
   runtime       = "python3.7"

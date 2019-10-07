@@ -1,5 +1,11 @@
+resource "random_string" "this" {
+  length = 8
+  special = false
+  upper   = false
+}
+
 resource "aws_sqs_queue" "slack_listener" {
-  name = "${var.project_name}-async-queue"
+  name = "${var.project_name}-async-queue-${random_string.this.result}"
   tags = var.tags
 }
 
@@ -37,23 +43,10 @@ resource "aws_lambda_event_source_mapping" "sqs" {
   batch_size = 1
 }
 
-# terraform seems to be adding a space between the region and account id in the
-# resulting policy which causes creates issues.. manually toggling the 
-# 'Use Lambda Proxy integration' option under the source method's 'Method Integration'
-# settings page fixes this
-# resource "aws_lambda_permission" "lambda_permission" {
-#   statement_id  = "AllowSlackNotifierInvoke"
-#   action        = "lambda:InvokeFunction"
-#   function_name = module.lambda.function_arn
-#   principal     = "apigateway.amazonaws.com"
-
-#   source_arn = var.slack_listener_api_endpoint_arn
-# }
-
 module "lambda" {
   source = "github.com/claranet/terraform-aws-lambda"
 
-  function_name = "${var.project_name}-slack-listener"
+  function_name = "${var.project_name}-slack-listener-${random_string.this.result}"
   description   = "Listens for slack events."
   handler       = "lambda.handler"
   runtime       = "python3.7"
