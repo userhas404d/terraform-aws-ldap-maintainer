@@ -183,26 +183,37 @@ def build_slack_user_message(event):
         channel=TARGET_CHANNEL,
         artifact_urls=payload['artifact_urls'],
         user_counts=payload['query_results']['totals'],
-        report_time=datetime.now().strftime("%m/%d, %Y"),
+        report_time=datetime.now().strftime("%m/%d/%Y, %H:%M:%S"),
         task_token=task_token
     )
     message = message_body.get_message_payload()
     return message
 
 
-def send_slack_response_message(event, message):
+def build_slack_response_message(original_blocks, msg):
     """Sends a response message to slack."""
-    headers = {
-        'Content-Type': 'application/json; charset=utf-8', 
-        'Authorization': f'Bearer {SLACK_API_TOKEN}'
-    }
-    channel = event['channel']['name']
-    return requests.post(
-        url=event['response_url'],
-        json={"channel": channel, "text": message},
-        headers=headers
+    updated_blocks = original_blocks[0:4]
+    updated_blocks.append(
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": msg
+            }
+        }
     )
-   
+    updated_blocks.append(original_blocks[5])
+    return updated_blocks
+
+
+def send_updated_message_to_slack(channel_id, timestamp, message_blocks):
+    client = slack.WebClient(token=SLACK_API_TOKEN)
+    response = client.chat_update(
+        channel=channel_id,
+        ts=timestamp,
+        blocks=message_blocks
+    )
+
 
 def send_message_to_slack(message):
     """Sends the user status report to slack."""
@@ -212,11 +223,21 @@ def send_message_to_slack(message):
 
 
 def handler(event, context):
-    log.debug(f"Received event: {json.dumps(event)}")
+    # log.debug(f"Received event: {json.dumps(event)}")
     if event.get('message_to_slack'):
         message = event['message_to_slack']
-        send_slack_response_message(event['event'], message)
+        slack_message = (
+            build_slack_response_message(
+                original_blocks=event['event']['message']['blocks'],
+                msg=message
+            )
+        )
+        send_updated_message_to_slack(
+            channel_id=event['event']['channel']['id'],
+            timestamp=event['event']['message']['ts'],
+            message_blocks=slack_message
+        )
     else:
         slack_message = build_slack_user_message(event)
         send_message_to_slack(slack_message)
-    return event 
+    return event

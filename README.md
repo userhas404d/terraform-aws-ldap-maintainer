@@ -21,6 +21,7 @@ A step function to maintain LDAP users via slack.
 
 ### Done
 
+- [x] [UPDATE](https://api.slack.com/methods/chat.update) the original message based on user inputs.
 - [x] Configure asynchronous invocation of the backend lambda function
 - [x] "are you sure" pop ups
 - [x] give user feedback when button is pressed.. (this should come from slack-listener)
