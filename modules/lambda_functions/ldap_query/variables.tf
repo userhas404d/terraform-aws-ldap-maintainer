@@ -1,7 +1,7 @@
 variable "project_name" {
-  default = "ldap-maintainer"
+  default     = "ldap-maintainer"
   description = "Name of the project"
-  type = string
+  type        = string
 }
 
 variable "ldaps_url" {
@@ -36,13 +36,24 @@ variable "log_level" {
 }
 
 variable "filter_prefixes" {
-  default = []
+  default     = []
   description = "List of three letter user name prefixes to filter out of the user search results"
-  type = list(string)
+  type        = list(string)
+}
+
+variable "additional_off_accounts" {
+  default     = []
+  description = ""
 }
 
 variable "tags" {
   default     = {}
   description = "Map of tags"
   type        = map(string)
+}
+
+variable "additional_hands_off_accounts" {
+  description = "List of accounts to prevent from ever disabling"
+  type = list(string)
+  default = []
 }

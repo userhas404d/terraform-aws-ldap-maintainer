@@ -1,5 +1,5 @@
 resource "random_string" "this" {
-  length = 8
+  length  = 8
   special = false
   upper   = false
 }
@@ -39,8 +39,8 @@ resource "aws_lambda_event_source_mapping" "sqs" {
     "module.lambda"
   ]
   event_source_arn = aws_sqs_queue.slack_listener.arn
-  function_name = module.lambda.function_name
-  batch_size = 1
+  function_name    = module.lambda.function_name
+  batch_size       = 1
 }
 
 module "lambda" {

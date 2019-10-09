@@ -10,7 +10,7 @@ import hmac
 import hashlib
 import logging
 import re
-from urllib.parse import quote_plus, unquote
+from urllib.parse import unquote
 
 DEFAULT_LOG_LEVEL = logging.DEBUG
 LOG_LEVELS = collections.defaultdict(
@@ -144,16 +144,21 @@ def handler(event, context):
     log.debug(f"{get_slack_payload(event)}")
     event = get_slack_payload(event)
 
-    SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
-    user_id = event['payload']['user']['id']
-    headers = event['params']['header']
-
     notify_stepfunction(event['payload'])
 
-    # validate the message received from slack and that the user is authorized to take the action
+    # validate the message received from slack and that
+    # the user is authorized to take the action
+
+    # SLACK_SIGNING_SECRET = os.environ['SLACK_SIGNING_SECRET']
+    # user_id = event['payload']['user']['id']
+    # headers = event['params']['header']
+
     # serialized_payload = get_reserialized_payload(event['payload'])
     # log.debug(f"serialized_payload: {serialized_payload}")
-    # log.debug(f"{verify_token(headers, serialized_payload, SLACK_SIGNING_SECRET)}")
+    # log.debug(f"{verify_token(
+    #   headers,
+    #   serialized_payload,
+    #   SLACK_SIGNING_SECRET)}")
 
     # if verify_token(slack_headers, event['body'], SLACK_SIGNING_SECRET):
     #     slack_payload = get_slack_payload(event)

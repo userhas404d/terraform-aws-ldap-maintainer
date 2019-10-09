@@ -31,7 +31,13 @@ variable "log_level" {
 }
 
 variable "filter_prefixes" {
-  default = []
+  default     = []
   description = "List of three letter user name prefixes to filter out of the user search results"
-  type = list(string)
+  type        = list(string)
+}
+
+variable "timezone" {
+  default     = "US/Eastern"
+  description = "Timezone that the slack notifications will be timestamped with"
+  type        = string
 }

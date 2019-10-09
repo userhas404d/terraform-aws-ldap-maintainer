@@ -1,5 +1,4 @@
 import boto3
-import base64
 import collections
 import json
 import logging
@@ -116,6 +115,8 @@ class LdapMaintainer:
         or configured with passwords that don't expire are ignored.
         """
 
+        non_svc_users = []
+
         # code reference:
         # https://jackstromberg.com/2013/01/useraccountcontrol-attributeflag-values/
         disabled_codes = [
@@ -129,14 +130,16 @@ class LdapMaintainer:
         ]
         # list of three letter prefixes to filter out of results
         filter_prefixes = json.loads(os.environ['FILTER_PREFIXES'])
-        non_svc_users = []
+        # list of accounts not to touch
+        hands_off = json.loads(os.environ['HANDS_OFF_ACCOUNTS'])
         for user in self.get_all_users():
             try:
                 uac = user[1][1]['userAccountControl'][0].decode("utf-8")
-                ucn = user[1][1]['cn'][0].decode("utf-8")[:3]
+                ucn = user[1][1]['cn'][0].decode("utf-8")
                 if (
                     uac not in disabled_codes and
-                    ucn not in filter_prefixes
+                    ucn[:3] not in filter_prefixes and
+                    ucn not in hands_off
                 ):
                     # only add the user dict object back to the resulting list
                     non_svc_users.append(user[1][1])
@@ -197,13 +200,14 @@ def create_table(content):
 def generate_artifacts(content):
     """Returns the list of objects to upload to s3"""
     artifacts = {}
-    artifacts['user_expiration_table.json'] = create_table(content)
+    artifacts['user_expiration_table'] = create_table(content)
     # artifacts.append(LdapMaintainer().get_ldif())
     return artifacts
 
 
 def put_object(dest_bucket_name, dest_object_name, src_data):
-    """Add an object to an Amazon S3 bucket
+    """
+    Add an object to an Amazon S3 bucket
     """
 
     # Construct Body= parameter
@@ -261,15 +265,14 @@ def upload_artifacts(content):
     bucket_name = os.environ['ARTIFACT_BUCKET']
     timestamp = datetime.now().strftime("%Y-%m-%d-T%H%M%S.%f")
     for key in artifacts:
-        object_name = f"{timestamp}-{key}"
+        object_name = f"{key}-{timestamp}.json"
         # log.debug(f'Uploading object: {object_name} to {bucket_name}')
         if put_object(
                 bucket_name,
                 object_name,
                 artifacts[key].encode("utf-8")):
             presigned_urls[key] = create_presigned_url(
-                bucket_name, object_name
-            )
+                bucket_name, object_name)
     return presigned_urls
 
 

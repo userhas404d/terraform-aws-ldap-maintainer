@@ -1,5 +1,5 @@
 import collections
-import json
+import dateutil.tz
 import logging
 import os
 from botocore.vendored import requests
@@ -40,6 +40,11 @@ log = logging.getLogger(__name__)
 
 
 SLACK_API_TOKEN = os.environ['SLACK_API_TOKEN']
+
+
+def get_time():
+    eastern = dateutil.tz.gettz(os.environ['TIMEZONE'])
+    return datetime.now(tz=eastern).strftime("%m/%d/%Y, %H:%M:%S")
 
 
 class SlackMessageBuilder:
@@ -86,7 +91,7 @@ class SlackMessageBuilder:
         self.channel = channel
         self.username = "ldapmaintainerbot"
         self.icon_emoji = ":robot_face:"
-        self.timestamp = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+        self.timestamp = get_time
         self.artifact_urls = artifact_urls
         self.user_counts = user_counts
         self.report_time = report_time
@@ -103,6 +108,7 @@ class SlackMessageBuilder:
                 self.DIVIDER_BLOCK,
                 self._get_artifact_urls_block(),
                 self.DIVIDER_BLOCK,
+                # self._get_button_header_block(),
                 self._get_buttons_block(),
                 self._get_context_block()
             ]
@@ -119,11 +125,8 @@ class SlackMessageBuilder:
         for url in self.artifact_urls:
             text += f"<{self.artifact_urls[url]}|{url}>\n"
         text += (
-            f"\n *Note*: When this message is 30 days old the "
-            f"attached document urls will no longer be functional\n\n"
-            f"\n Select Approve or Deny to disable the accounts that"
-            f" have not updated their passwords in greater than 120 days"
-            )
+            f"\n *Note*: When this message is 1 hour old these"
+            f" urls will no longer be functional\n\n")
         return self._get_text_block(text)
 
     def _get_context_block(self):
@@ -133,6 +136,23 @@ class SlackMessageBuilder:
                 {
                     "type": "mrkdwn",
                     "text": f"Report Generated: {self.report_time}"
+                }
+            ]
+        }
+
+    @staticmethod
+    def _get_button_header_block():
+        return {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": (
+                        f"\n Select Approve or Deny to"
+                        f" disable the accounts that"
+                        f" have not updated their passwords"
+                        f" in greater than 120 days"
+                        )
                 }
             ]
         }
@@ -193,6 +213,7 @@ def build_slack_user_message(event):
 def build_slack_response_message(original_blocks, msg):
     """Sends a response message to slack."""
     updated_blocks = original_blocks[0:4]
+    del updated_blocks[3]
     updated_blocks.append(
         {
             "type": "section",
@@ -213,6 +234,8 @@ def send_updated_message_to_slack(channel_id, timestamp, message_blocks):
         ts=timestamp,
         blocks=message_blocks
     )
+    log.debug(f"Received response from slack: {response}")
+    assert response["ok"]
 
 
 def send_message_to_slack(message):

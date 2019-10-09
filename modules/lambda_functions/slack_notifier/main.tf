@@ -1,6 +1,6 @@
 
 resource "random_string" "this" {
-  length = 8
+  length  = 8
   special = false
   upper   = false
 }
@@ -31,6 +31,7 @@ module "lambda" {
       SLACK_CHANNEL_ID = var.slack_channel_id
       SFN_ACTIVITY_ARN = var.sfn_activity_arn
       INVOKE_BASE_URL  = var.invoke_base_url
+      TIMEZONE         = var.timezone
       LOG_LEVEL        = var.log_level
     }
   }

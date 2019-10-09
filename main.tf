@@ -20,7 +20,7 @@ module "slack_event_listener" {
 
   slack_listener_api_endpoint_arn = module.api_gateway.slack_listener_api_endpoint_arn
 
-  log_level = "Debug"
+  log_level = var.log_level
 }
 
 module "ldap_query_lambda" {
@@ -34,10 +34,10 @@ module "ldap_query_lambda" {
   svc_user_pwd_ssm_key = var.svc_user_pwd_ssm_key
   vpc_id               = var.vpc_id
 
-  log_level = "Debug"
+  log_level = var.log_level
 }
 
-module "manual_step_activity_worker" {
+module "slack_notifier" {
   source = "./modules/lambda_functions/slack_notifier"
 
   project_name     = var.project_name
@@ -46,7 +46,16 @@ module "manual_step_activity_worker" {
   sfn_activity_arn = aws_sfn_activity.account_deactivation_approval.id
   invoke_base_url  = module.api_gateway.invoke_url
 
-  log_level = "Debug"
+  log_level = var.log_level
+}
+
+module "dynamodb_cleanup" {
+  source = "./modules/lambda_functions/dynamodb_cleanup"
+
+  project_name        = var.project_name
+  dynamodb_table_name = var.dynamodb_table_name
+
+  log_level = var.log_level
 }
 
 # step function 
@@ -57,7 +66,8 @@ data "aws_iam_policy_document" "sfn" {
     ]
     resources = [
       module.ldap_query_lambda.function_arn,
-      module.manual_step_activity_worker.function_arn
+      module.slack_notifier.function_arn,
+      module.dynamodb_cleanup.function_arn
     ]
   }
 }
@@ -117,7 +127,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
       "Parameters": {
-            "FunctionName": "${module.manual_step_activity_worker.function_name}",
+            "FunctionName": "${module.slack_notifier.function_name}",
             "Payload":{  
                "event.$": "$",
                "token.$": "$$.Task.Token"
@@ -142,7 +152,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-            "FunctionName": "${module.manual_step_activity_worker.function_name}",
+            "FunctionName": "${module.slack_notifier.function_name}",
             "Payload":{  
                "event.$": "$",
                "message_to_slack": "The LDAP operation has been disapproved"
@@ -160,7 +170,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
     "Type": "Task",
     "Resource": "arn:aws:states:::lambda:invoke",
     "Parameters": {
-      "FunctionName": "${module.manual_step_activity_worker.function_name}",
+      "FunctionName": "${module.slack_notifier.function_name}",
       "Payload": {
         "event.$": "$",
         "message_to_slack": "The LDAP operation has been approved. I'll notify you when the operation is complete."
@@ -179,6 +189,18 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
         "event.$": "$"
       }
     },
+    "Next": "dynamodb_cleanup"
+    },
+
+    "dynamodb_cleanup": {
+    "Type": "Task",
+    "Resource": "arn:aws:states:::lambda:invoke",
+    "Parameters": {
+      "FunctionName": "${module.dynamodb_cleanup.function_arn}",
+      "Payload": {
+        "event.$": "$"
+      }
+    },
     "Next": "send_status_to_slack"
     },
 
@@ -186,7 +208,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-            "FunctionName": "${module.manual_step_activity_worker.function_name}",
+            "FunctionName": "${module.slack_notifier.function_name}",
             "Payload":{
                "event.$": "$.Payload.event.Payload.event",
                "message_to_slack": "LDAP operations are complete"

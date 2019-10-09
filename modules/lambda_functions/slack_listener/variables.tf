@@ -1,7 +1,7 @@
 variable "project_name" {
-  default = "ldap-maintainer"
+  default     = "ldap-maintainer"
   description = "Name of the project"
-  type = string
+  type        = string
 }
 
 variable "slack_api_token" {
@@ -16,20 +16,20 @@ variable "log_level" {
 }
 
 variable "slack_listener_api_endpoint_arn" {
-  default = ""
+  default     = ""
   description = ""
-  type = string
+  type        = string
 }
 
 variable "slack_signing_secret" {
-  default = ""
+  default     = ""
   description = "The slack application's signing secret"
-  type = string
+  type        = string
 }
 
 variable "step_function_arns" {
   description = "List of state machine ARNs that the api gateway is able to perform actions against"
-  type = list(string)
+  type        = list(string)
 }
 
 variable "tags" {
@@ -40,5 +40,5 @@ variable "tags" {
 
 variable "api_gw_role_arn" {
   default = ""
-  type = string
+  type    = string
 }

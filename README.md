@@ -6,8 +6,10 @@ A step function to maintain LDAP users via slack.
 
 ## ToDo
 
+- [ ] add user's email to ldap_query's results
+- [ ] s3 objects should be deleted after 30 days
 - [ ] LDAP query should be able to send queries and perform actions
-  
+
 - [ ] determine how to validate the user
     - get group members from a target security group and check the user's email against them? would require the slack library in slack-listener to query the user's email address
     - lock the integration to a specific channel?
@@ -21,6 +23,8 @@ A step function to maintain LDAP users via slack.
 
 ### Done
 
+- [x] Add list of hands off accounts to ldap
+- [x] Message time stamp should be from the right time zone
 - [x] [UPDATE](https://api.slack.com/methods/chat.update) the original message based on user inputs.
 - [x] Configure asynchronous invocation of the backend lambda function
 - [x] "are you sure" pop ups

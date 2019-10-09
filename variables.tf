@@ -56,3 +56,8 @@ variable "filter_prefixes" {
   description = "List of three letter user name prefixes to filter out of the user search results"
   type        = list(string)
 }
+
+variable "dynamodb_table_name" {
+  description = "Name of the dynamodb to take actions against"
+  type        = string
+}
