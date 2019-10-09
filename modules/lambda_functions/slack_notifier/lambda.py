@@ -1,5 +1,6 @@
 import collections
 import dateutil.tz
+import json
 import logging
 import os
 from botocore.vendored import requests
@@ -91,7 +92,7 @@ class SlackMessageBuilder:
         self.channel = channel
         self.username = "ldapmaintainerbot"
         self.icon_emoji = ":robot_face:"
-        self.timestamp = get_time
+        self.timestamp = get_time()
         self.artifact_urls = artifact_urls
         self.user_counts = user_counts
         self.report_time = report_time
@@ -206,8 +207,7 @@ def build_slack_user_message(event):
         report_time=datetime.now().strftime("%m/%d/%Y, %H:%M:%S"),
         task_token=task_token
     )
-    message = message_body.get_message_payload()
-    return message
+    return message_body.get_message_payload()
 
 
 def build_slack_response_message(original_blocks, msg):
@@ -246,7 +246,7 @@ def send_message_to_slack(message):
 
 
 def handler(event, context):
-    # log.debug(f"Received event: {json.dumps(event)}")
+    log.debug(f"Received event: {json.dumps(event)}")
     if event.get('message_to_slack'):
         message = event['message_to_slack']
         slack_message = (
