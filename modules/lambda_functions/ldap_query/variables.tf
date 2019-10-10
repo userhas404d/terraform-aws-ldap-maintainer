@@ -54,6 +54,16 @@ variable "tags" {
 
 variable "additional_hands_off_accounts" {
   description = "List of accounts to prevent from ever disabling"
-  type = list(string)
-  default = []
+  type        = list(string)
+  default     = []
+}
+
+variable "artifacts_bucket_arn" {
+  description = "ARN of the artifacts bucket"
+  type        = string
+}
+
+variable "artifacts_bucket_name" {
+  description = "Name of the artifacts bucket"
+  type        = string
 }

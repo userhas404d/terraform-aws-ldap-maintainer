@@ -1,9 +1,9 @@
+import boto3
 import collections
 import dateutil.tz
 import json
 import logging
 import os
-from botocore.vendored import requests
 from datetime import datetime
 
 import slack
@@ -41,6 +41,7 @@ log = logging.getLogger(__name__)
 
 
 SLACK_API_TOKEN = os.environ['SLACK_API_TOKEN']
+s3 = boto3.client('s3')
 
 
 def get_time():
@@ -243,6 +244,34 @@ def send_message_to_slack(message):
     client = slack.WebClient(token=SLACK_API_TOKEN)
     response = client.chat_postMessage(**message)
     assert response["ok"]
+
+
+def get_last_modified():
+    return lambda obj: int(obj['LastModified'].strftime('%s'))
+
+
+def get_latest_s3_object(
+    bucket=os.environ['ARTIFACT_BUCKET'],
+    prefix='slack_response'
+):
+    """
+    Retrieve the newest object in the target s3 bucket
+    """
+    response = s3.list_objects_v2(
+        Bucket=bucket,
+        Prefix=prefix)
+    all = response['Contents']
+    return max(all, key=lambda x: x['LastModified'])
+
+
+def retrieve_s3_object_contents(
+    s3_obj,
+    bucket=os.environ['ARTIFACT_BUCKET']
+):
+    return json.loads(s3.get_object(
+        Bucket=bucket,
+        Key=s3_obj['Key']
+        )['Body'].read().decode('utf-8'))
 
 
 def handler(event, context):

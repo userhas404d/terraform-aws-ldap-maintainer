@@ -5,6 +5,16 @@ resource "random_string" "this" {
   upper   = false
 }
 
+data "aws_iam_policy_document" "lambda" {
+  statement {
+    sid = "AllowS3Write"
+    actions = [
+      "s3:*"
+    ]
+    resources = [var.artifacts_bucket_arn]
+  }
+}
+
 resource "aws_lambda_layer_version" "lambda_layer" {
   filename         = "${path.module}/lambda_layer_payload.zip"
   layer_name       = "python-ldap-${random_string.this.result}"
@@ -27,14 +37,19 @@ module "lambda" {
 
   environment = {
     variables = {
+      ARTIFACTS_BUCKET = var.artifacts_bucket_name
+      INVOKE_BASE_URL  = var.invoke_base_url
+      LOG_LEVEL        = var.log_level
       SLACK_API_TOKEN  = var.slack_api_token
       SLACK_CHANNEL_ID = var.slack_channel_id
       SFN_ACTIVITY_ARN = var.sfn_activity_arn
-      INVOKE_BASE_URL  = var.invoke_base_url
       TIMEZONE         = var.timezone
-      LOG_LEVEL        = var.log_level
     }
   }
 
   layers = [aws_lambda_layer_version.lambda_layer.arn]
+
+  policy = {
+    json = data.aws_iam_policy_document.lambda.json
+  }
 }

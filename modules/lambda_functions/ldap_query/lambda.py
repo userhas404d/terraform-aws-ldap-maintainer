@@ -45,7 +45,9 @@ DOMAIN_BASE = os.environ['DOMAIN_BASE']
 SSM_KEY = os.environ['SSM_KEY']
 SVC_USER_DN = os.environ['SVC_USER_DN']
 
+s3 = boto3.client('s3')
 ssm = boto3.client('ssm')
+
 SVC_USER_PWD = ssm.get_parameter(
     Name=SSM_KEY,
     WithDecryption=True
@@ -92,7 +94,6 @@ class LdapMaintainer:
             ldap.SCOPE_SUBTREE,
             filter_string
         )
-
         try:
             partial = ldap_async.processResults()
         except ldap_async.SIZELIMIT_EXCEEDED:
@@ -104,9 +105,35 @@ class LdapMaintainer:
         self.connection.unbind()
         return ldap_async.allResults
 
+    @staticmethod
+    def byte_decode_search_results(search_results):
+        users = []
+        for user in search_results:
+            user_obj = {}
+            for attribute in user[1][1]:
+                try:
+                    attribute_list = user[1][1][attribute]
+                    for i in range(len(attribute_list)):
+                        try:
+                            attribute_list[i] = (
+                                attribute_list[i].decode('utf-8'))
+                        except UnicodeDecodeError:
+                            # ignore the user's GUID and SID
+                            attribute_list[i] = "ignored"
+                            continue
+                except TypeError:
+                    # some elements are already strings
+                    # so just continue past them
+                    continue
+            user_obj['dn'] = user[1][0]
+            user_obj['user'] = user[1][1]
+            users.append(user_obj)
+        return users
+
     def get_all_users(self):
         """Search LDAP and return all user objects."""
-        return self.search("(&(objectCategory=person)(objectClass=user))")
+        return self.byte_decode_search_results(
+            self.search("(&(objectCategory=person)(objectClass=user))"))
 
     def get_users(self):
         """
@@ -132,30 +159,52 @@ class LdapMaintainer:
         filter_prefixes = json.loads(os.environ['FILTER_PREFIXES'])
         # list of accounts not to touch
         hands_off = json.loads(os.environ['HANDS_OFF_ACCOUNTS'])
-        for user in self.get_all_users():
+        for user_obj in self.get_all_users():
             try:
-                uac = user[1][1]['userAccountControl'][0].decode("utf-8")
-                ucn = user[1][1]['cn'][0].decode("utf-8")
+                uac = user_obj['user']['userAccountControl'][0]
+                sam_name = user_obj['user']['sAMAccountName'][0]
                 if (
                     uac not in disabled_codes and
-                    ucn[:3] not in filter_prefixes and
-                    ucn not in hands_off
+                    sam_name[:3] not in filter_prefixes and
+                    sam_name not in hands_off
                 ):
-                    # only add the user dict object back to the resulting list
-                    non_svc_users.append(user[1][1])
+                    non_svc_users.append(user_obj['user'])
             except TypeError:
                 continue
-
+        # log.debug(f"found users that met filter criteria: {non_svc_users}")
         return non_svc_users
+
+    def disable_users(self, user_list):
+        con = self.connect()
+        date = datetime.now().strftime("%Y-%m-%d-T%H%M%S.%f")
+        d = f"***Disabled {date} by ldapmaintbot***"
+        for user_obj in user_list:
+            disable_user = [(
+                ldap.MOD_REPLACE,
+                'userAccountControl',
+                [b'66050'])]
+            update_description = [(
+                ldap.MOD_REPLACE,
+                'description',
+                [d.encode('utf-8')])]
+            con.modify_s(user_obj['dn'], disable_user)
+            con.modify_s(user_obj['dn'], update_description)
 
     def get_stale_users(self):
         """
-        Returns object of users that have not logged on
+        Returns map of users that have not logged on
         in 120, 90, and 60 day increments
 
         example:
         {
-            "120": [userobj0, userobj1, etc..]
+            "120": [
+                {
+                    "name" = "Jane Doe",
+                    "email" = "jane.doe@someemail.com",
+                    "dn" = ""
+
+                }
+            ]
             "90": [userobj0, userobj1, etc..]
             "60": [userobj0, userobj1, etc..]
             "never": [userobj0, userobj1, etc..]
@@ -168,17 +217,19 @@ class LdapMaintainer:
             "never": []
         }
         today = datetime.now()
-        for user in self.get_users():
+        for user_obj in self.get_users():
             try:
-                ft = user['pwdLastSet'][0].decode("utf-8")
+                # log.debug(f'processing user: {user_obj}')
+                ft = user_obj['pwdLastSet'][0]
                 pwd_last_set = self.filetime_to_dt(ft)
                 days = (today - pwd_last_set).days
                 user = {
-                    "name": user['cn'][0].decode("utf-8"),
-                    "email": user['mail'][0].decode("utf-8"),
-                    "dn": user['dn'][0].decode("utf-8"),
+                    "name": user_obj['cn'][0],
+                    "email": user_obj['mail'][0],
+                    "dn": user_obj['distinguishedName'][0],
                     "days_since_last_pwd_change": days
                 }
+                # log.debug(f'got user: {user}')
                 if days >= 120:
                     stale_users["120"].append(user)
                 elif days >= 90:
@@ -186,8 +237,8 @@ class LdapMaintainer:
                 elif days >= 60:
                     stale_users["60"].append(user)
             except KeyError:
-                stale_users["never"].append(user)
                 continue
+        # log.debug(f"retrieved the following stale users: {stale_users}")
         return stale_users
 
     def get_ldif(self):
@@ -225,8 +276,7 @@ def put_object(dest_bucket_name, dest_object_name, src_data):
 
     # Put the object
     s3 = boto3.client('s3')
-    log.debug(f"destination object name: {dest_object_name}")
-    log.debug(f"destination bucket name: {dest_bucket_name}")
+    # log.debug(f"destination object name: {dest_object_name}")
     try:
         s3.put_object(
             Bucket=dest_bucket_name,
@@ -288,6 +338,39 @@ def get_user_counts(users):
     return response
 
 
+def get_last_modified():
+    return lambda obj: int(obj['LastModified'].strftime('%s'))
+
+
+def get_latest_s3_object(
+    bucket=os.environ['ARTIFACT_BUCKET'],
+    prefix='user_expiration_table'
+):
+    """
+    Retrieve the newest object in the target s3 bucket
+    """
+    response = s3.list_objects_v2(
+        Bucket=bucket,
+        Prefix=prefix)
+    all = response['Contents']
+    return max(all, key=lambda x: x['LastModified'])
+
+
+def retrieve_s3_object_contents(
+    s3_obj,
+    bucket=os.environ['ARTIFACT_BUCKET']
+):
+    return json.loads(s3.get_object(
+        Bucket=bucket,
+        Key=s3_obj['Key']
+        )['Body'].read().decode('utf-8'))
+
+
+def get_previous_scan_results():
+    s3_obj = get_latest_s3_object()
+    return retrieve_s3_object_contents(s3_obj)
+
+
 def handler(event, context):
     """
     expected event:
@@ -300,13 +383,13 @@ def handler(event, context):
         event = event['Input']
     if event.get("action"):
         if event['action'] == "query":
-            # users = LdapMaintainer().get_stale_users()
-            users = {
-                "120": ["user1", "user2", "user3"],
-                "90": ["user1", "user2", "user3"],
-                "60": ["user1", "user2", "user3"],
-                "never": ["user1", "user2", "user3"],
-            }
+            users = LdapMaintainer().get_stale_users()
+            # users = {
+            #     "120": ["user1", "user2", "user3"],
+            #     "90": ["user1", "user2", "user3"],
+            #     "60": ["user1", "user2", "user3"],
+            #     "never": ["user1", "user2", "user3"],
+            # }
             log.debug(f"Ldap query results: {users}")
             return {
                 "query_results": {
@@ -315,7 +398,6 @@ def handler(event, context):
                 "artifact_urls": upload_artifacts(users),
                 }
         elif event['action'] == "disable":
-            # what does this look like?
-            return {
-                "user_details": []
-            }
+            users = get_previous_scan_results()['120']
+            log.info(f"users to disable: {users}")
+            # LdapMaintainer().disable_users(users)

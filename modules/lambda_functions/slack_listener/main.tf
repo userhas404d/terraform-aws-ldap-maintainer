@@ -9,8 +9,6 @@ resource "aws_sqs_queue" "slack_listener" {
   tags = var.tags
 }
 
-# give lambda function the ability to tell sfn if the user
-# clicked approve or deny
 data "aws_iam_policy_document" "lambda" {
   # need to make this less permissive
   statement {
@@ -19,6 +17,16 @@ data "aws_iam_policy_document" "lambda" {
       "states:*"
     ]
     resources = var.step_function_arns
+  }
+
+  statement {
+    sid = "AllowS3Write"
+    actions = [
+      "s3:*"
+    ]
+    resources = [
+      var.artifacts_bucket_arn
+      ]
   }
 
   statement {
@@ -56,9 +64,10 @@ module "lambda" {
 
   environment = {
     variables = {
+      ARTIFACTS_BUCKET     = var.artifacts_bucket_name
+      LOG_LEVEL            = var.log_level
       SLACK_API_TOKEN      = var.slack_api_token
       SLACK_SIGNING_SECRET = var.slack_signing_secret
-      LOG_LEVEL            = var.log_level
     }
   }
 

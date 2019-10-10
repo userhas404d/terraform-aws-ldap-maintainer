@@ -61,3 +61,8 @@ variable "dynamodb_table_name" {
   description = "Name of the dynamodb to take actions against"
   type        = string
 }
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}

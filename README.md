@@ -6,9 +6,9 @@ A step function to maintain LDAP users via slack.
 
 ## ToDo
 
-- [ ] add user's email to ldap_query's results
+- [ ] store initial slack response in s3 so sfn events don't become bloated
+- [ ] conditionally deploy a windows instance into the test simplead env with AD tools installed
 - [ ] s3 objects should be deleted after 30 days
-- [ ] LDAP query should be able to send queries and perform actions
 
 - [ ] determine how to validate the user
     - get group members from a target security group and check the user's email against them? would require the slack library in slack-listener to query the user's email address
@@ -23,6 +23,8 @@ A step function to maintain LDAP users via slack.
 
 ### Done
 
+- [x] LDAP query should be able to send queries and perform actions
+- [x] add user's email to ldap_query's results
 - [x] Add list of hands off accounts to ldap
 - [x] Message time stamp should be from the right time zone
 - [x] [UPDATE](https://api.slack.com/methods/chat.update) the original message based on user inputs.

@@ -42,3 +42,13 @@ variable "api_gw_role_arn" {
   default = ""
   type    = string
 }
+
+variable "artifacts_bucket_arn" {
+  description = "ARN of the artifacts bucket"
+  type        = string
+}
+
+variable "artifacts_bucket_name" {
+  description = "Name of the artifacts bucket"
+  type        = string
+}

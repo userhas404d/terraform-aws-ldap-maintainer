@@ -12,11 +12,13 @@ module "api_gateway" {
 module "slack_event_listener" {
   source = "./modules/lambda_functions/slack_listener"
 
-  project_name         = var.project_name
-  slack_api_token      = var.slack_api_token
-  slack_signing_secret = var.slack_signing_secret
-  step_function_arns   = list(aws_sfn_state_machine.ldap_maintenance.id)
-  api_gw_role_arn      = module.api_gateway.api_gw_role_arn
+  project_name          = var.project_name
+  artifacts_bucket_name = aws_s3_bucket.artifacts.id
+  artifacts_bucket_arn  = aws_s3_bucket.artifacts.arn
+  slack_api_token       = var.slack_api_token
+  slack_signing_secret  = var.slack_signing_secret
+  step_function_arns    = list(aws_sfn_state_machine.ldap_maintenance.id)
+  api_gw_role_arn       = module.api_gateway.api_gw_role_arn
 
   slack_listener_api_endpoint_arn = module.api_gateway.slack_listener_api_endpoint_arn
 
@@ -26,13 +28,15 @@ module "slack_event_listener" {
 module "ldap_query_lambda" {
   source = "./modules/lambda_functions/ldap_query"
 
-  project_name         = var.project_name
-  ldaps_url            = var.ldaps_url
-  domain_base_dn       = var.domain_base_dn
-  filter_prefixes      = var.filter_prefixes
-  svc_user_dn          = var.svc_user_dn
-  svc_user_pwd_ssm_key = var.svc_user_pwd_ssm_key
-  vpc_id               = var.vpc_id
+  project_name          = var.project_name
+  artifacts_bucket_name = aws_s3_bucket.artifacts.id
+  artifacts_bucket_arn  = aws_s3_bucket.artifacts.arn
+  ldaps_url             = var.ldaps_url
+  domain_base_dn        = var.domain_base_dn
+  filter_prefixes       = var.filter_prefixes
+  svc_user_dn           = var.svc_user_dn
+  svc_user_pwd_ssm_key  = var.svc_user_pwd_ssm_key
+  vpc_id                = var.vpc_id
 
   log_level = var.log_level
 }
@@ -40,11 +44,13 @@ module "ldap_query_lambda" {
 module "slack_notifier" {
   source = "./modules/lambda_functions/slack_notifier"
 
-  project_name     = var.project_name
-  slack_channel_id = var.slack_channel_id
-  slack_api_token  = var.slack_api_token
-  sfn_activity_arn = aws_sfn_activity.account_deactivation_approval.id
-  invoke_base_url  = module.api_gateway.invoke_url
+  project_name          = var.project_name
+  artifacts_bucket_name = aws_s3_bucket.artifacts.id
+  artifacts_bucket_arn  = aws_s3_bucket.artifacts.arn
+  slack_channel_id      = var.slack_channel_id
+  slack_api_token       = var.slack_api_token
+  sfn_activity_arn      = aws_sfn_activity.account_deactivation_approval.id
+  invoke_base_url       = module.api_gateway.invoke_url
 
   log_level = var.log_level
 }
@@ -56,6 +62,48 @@ module "dynamodb_cleanup" {
   dynamodb_table_name = var.dynamodb_table_name
 
   log_level = var.log_level
+}
+
+# artifacts bucket
+resource "random_string" "this" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
+resource "aws_s3_bucket" "artifacts" {
+  bucket = "${var.project_name}-artifacts-${random_string.this.result}"
+
+  acl  = "private"
+  tags = var.tags
+}
+
+resource "aws_s3_bucket_policy" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+  policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Id": "lambda_access",
+  "Statement": [
+    {
+        "Effect": "Allow",
+        "Principal": {
+            "AWS": [
+              "${module.slack_notifier.role_arn}",
+              "${module.slack_event_listener.role_arn}",
+              "${module.slack_notifier.role_arn}"
+              ]
+        },
+        "Action": [
+            "s3:GetObject",
+            "s3:PutObject",
+            "s3:DeleteObject"
+        ],
+        "Resource": "${aws_s3_bucket.artifacts.arn}/*"
+    }
+  ]
+}
+  POLICY
 }
 
 # step function 
@@ -185,8 +233,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
     "Parameters": {
       "FunctionName": "${module.ldap_query_lambda.function_arn}",
       "Payload": {
-        "action": "disable",
-        "event.$": "$"
+        "Input": {"action": "disable"}
       }
     },
     "Next": "dynamodb_cleanup"

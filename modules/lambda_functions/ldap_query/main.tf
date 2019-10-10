@@ -7,37 +7,6 @@ resource "random_string" "this" {
   upper   = false
 }
 
-resource "aws_s3_bucket" "artifacts" {
-  bucket = "${var.project_name}-artifacts-${random_string.this.result}"
-
-  acl  = "private"
-  tags = var.tags
-}
-
-resource "aws_s3_bucket_policy" "artifacts" {
-  bucket = aws_s3_bucket.artifacts.id
-  policy = <<POLICY
-{
-  "Version": "2012-10-17",
-  "Id": "lambda_access",
-  "Statement": [
-    {
-        "Effect": "Allow",
-        "Principal": {
-            "AWS": "${module.lambda.role_arn}"
-        },
-        "Action": [
-            "s3:GetObject",
-            "s3:PutObject",
-            "s3:DeleteObject"
-        ],
-        "Resource": "${aws_s3_bucket.artifacts.arn}/*"
-    }
-  ]
-}
-  POLICY
-}
-
 data "aws_iam_policy_document" "lambda" {
   # need to make this less permissive
   statement {
@@ -49,10 +18,9 @@ data "aws_iam_policy_document" "lambda" {
 
   statement {
     actions   = ["S3:*"]
-    resources = [aws_s3_bucket.artifacts.arn]
+    resources = [var.artifacts_bucket_arn]
   }
 }
-
 
 data "aws_subnet_ids" "private" {
   vpc_id = var.vpc_id
@@ -120,7 +88,7 @@ module "lambda" {
       FILTER_PREFIXES    = jsonencode(var.filter_prefixes)
       SSM_KEY            = var.svc_user_pwd_ssm_key
       LOG_LEVEL          = var.log_level
-      ARTIFACT_BUCKET    = aws_s3_bucket.artifacts.id
+      ARTIFACT_BUCKET    = var.artifacts_bucket_name
       HANDS_OFF_ACCOUNTS = jsonencode(local.hands_off_accounts)
     }
   }

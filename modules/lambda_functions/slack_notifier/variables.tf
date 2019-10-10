@@ -41,3 +41,18 @@ variable "timezone" {
   description = "Timezone that the slack notifications will be timestamped with"
   type        = string
 }
+
+variable "artifacts_bucket_arn" {
+  description = "ARN of the artifacts bucket"
+  type        = string
+}
+
+variable "artifacts_bucket_name" {
+  description = "Name of the artifacts bucket"
+  type        = string
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}

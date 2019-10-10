@@ -11,6 +11,7 @@ import hashlib
 import logging
 import re
 from urllib.parse import unquote
+from datetime import datetime
 
 DEFAULT_LOG_LEVEL = logging.DEBUG
 LOG_LEVELS = collections.defaultdict(
@@ -48,6 +49,8 @@ BOT_TOKEN = os.environ["SLACK_API_TOKEN"]
 # Define the URL of the targeted Slack API resource.
 # We'll send our replies there.
 SLACK_URL = "https://slack.com/api/chat.postMessage"
+
+s3 = boto3.client('s3')
 
 
 def get_http_response(httpStatusCode, body, headers={}):
@@ -139,11 +142,63 @@ def get_reserialized_payload(event):
     return event
 
 
+def put_object(dest_bucket_name, dest_object_name, src_data):
+    """
+    Add an object to an Amazon S3 bucket
+    """
+
+    # Construct Body= parameter
+    if isinstance(src_data, bytes):
+        object_data = src_data
+    else:
+        log.error(f"Type of {str(type(src_data))}"
+                  f" for the argument \'src_data\' is not supported.")
+        return False
+
+    # Put the object
+    s3 = boto3.client('s3')
+    # log.debug(f"destination object name: {dest_object_name}")
+    try:
+        s3.put_object(
+            Bucket=dest_bucket_name,
+            ACL="private",
+            Key=dest_object_name,
+            Body=object_data
+            )
+    except s3.exceptions.ClientError as e:
+        # AllAccessDisabled error == bucket not found
+        # NoSuchKey or InvalidRequest
+        # error == (dest bucket/obj == src bucket/obj)
+        log.error(e)
+        return False
+    finally:
+        if isinstance(src_data, str):
+            object_data.close()
+    return True
+
+
+def s3upload(
+    object_content,
+    prefix="slack-response",
+    bucket=os.environ['ARTIFACT_BUCKET']
+):
+    timestamp = datetime.now().strftime("%Y-%m-%d-T%H%M%S.%f")
+    object_name = f"{prefix}-{timestamp}.json"
+    log.debug(f'Uploading object: {object_name} to {bucket}')
+    put_object(
+            bucket,
+            object_name,
+            object_content.encode("utf-8"))
+
+
 def handler(event, context):
     log.debug(f"received event: {event}")
-    log.debug(f"{get_slack_payload(event)}")
+    # parse the slack payload
     event = get_slack_payload(event)
-
+    log.debug(f"received slack payload: {event}")
+    # upload the payload to s3
+    s3upload(event['payload'])
+    # send button status to the stepfunction
     notify_stepfunction(event['payload'])
 
     # validate the message received from slack and that
