@@ -175,6 +175,8 @@ class LdapMaintainer:
                 days = (today - pwd_last_set).days
                 user = {
                     "name": user['cn'][0].decode("utf-8"),
+                    "email": user['mail'][0].decode("utf-8"),
+                    "dn": user['dn'][0].decode("utf-8"),
                     "days_since_last_pwd_change": days
                 }
                 if days >= 120:
@@ -190,10 +192,13 @@ class LdapMaintainer:
 
     def get_ldif(self):
         """Creates a ldif document with the query results"""
+        # could be an alternative way of user disablement
 
 
 def create_table(content):
     """create a table"""
+    # This can be fleshed out to make the retrieved information
+    # more user friendly
     return json.dumps(content)
 
 
@@ -266,7 +271,7 @@ def upload_artifacts(content):
     timestamp = datetime.now().strftime("%Y-%m-%d-T%H%M%S.%f")
     for key in artifacts:
         object_name = f"{key}-{timestamp}.json"
-        # log.debug(f'Uploading object: {object_name} to {bucket_name}')
+        log.debug(f'Uploading object: {object_name} to {bucket_name}')
         if put_object(
                 bucket_name,
                 object_name,
@@ -307,7 +312,10 @@ def handler(event, context):
                 "query_results": {
                     "totals": get_user_counts(users)
                 },
-                "artifact_urls": upload_artifacts(users)
+                "artifact_urls": upload_artifacts(users),
                 }
         elif event['action'] == "disable":
-            return event
+            # what does this look like?
+            return {
+                "user_details": []
+            }

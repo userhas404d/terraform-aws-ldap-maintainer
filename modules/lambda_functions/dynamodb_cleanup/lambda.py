@@ -97,6 +97,9 @@ def remove_users_in_list(users):
         remove_user(user['email'], scan_results)
 
 
-# def handler(event, context):
-#     log.debug(f"Received event: {event}")
-#     return event
+def handler(event, context):
+    log.debug(f"Received event: {event}")
+    if event.get('users'):
+        # remove_users_in_list(event['users'])
+        return "Success"
+    return "Failed"

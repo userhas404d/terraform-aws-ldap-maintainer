@@ -210,7 +210,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
       "Parameters": {
             "FunctionName": "${module.slack_notifier.function_name}",
             "Payload":{
-               "event.$": "$.Payload.event.Payload.event",
+               "event.$": "$",
                "message_to_slack": "LDAP operations are complete"
             }
       },
