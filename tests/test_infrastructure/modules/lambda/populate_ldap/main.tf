@@ -56,6 +56,7 @@ module "lambda" {
       SVC_USER_DN        = var.svc_user_dn
       SVC_USER_PWD       = var.svc_user_pwd
       LOG_LEVEL          = var.log_level
+      TEST_USERS         = jsonencode(var.test_users)
     }
   }
 

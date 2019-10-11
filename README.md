@@ -6,13 +6,13 @@ A step function to maintain LDAP users via slack.
 
 ## ToDo
 
+- [ ] implement autodocstring across functions
 - [ ] move username list to terraform
 - [ ] populate ldap with user emails
 - [ ] run through an end to end test
 - [ ] create screen capture of workflow
 - [ ] conditionally deploy a windows instance into the test simplead env with AD tools installed
 - [ ] s3 objects should be deleted after 30 days
-
 - [ ] determine how to validate the user
     - get group members from a target security group and check the user's email against them? would require the slack library in slack-listener to query the user's email address
     - lock the integration to a specific channel?

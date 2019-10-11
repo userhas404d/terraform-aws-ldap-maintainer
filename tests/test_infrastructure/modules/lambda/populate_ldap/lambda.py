@@ -1,6 +1,8 @@
 import collections
+import json
 import logging
 import os
+import random
 from datetime import datetime
 
 import ldap
@@ -147,11 +149,13 @@ class LdapMaintainer:
             except ldap.ALREADY_EXISTS:
                 continue
 
-    def disable_users(self, user_list):
+    def disable_random_users(self, user_list):
         con = self.connect()
-        date = datetime.now().strftime("%Y-%m-%d-T%H%M%S.%f")
+        date = datetime.now().strftime("%Y-%m-%d-T%H%M")
         d = f"***Disabled {date} by ldapmaintbot***"
-        for user_obj in user_list:
+        # get a random list of 5 users and disable them
+        random_list = random.sample(user_list, 5)
+        for user_obj in random_list:
             disable_user = [(
                 ldap.MOD_REPLACE,
                 'userAccountControl',
@@ -220,7 +224,7 @@ def generate_test_user_objects(test_users):
                 "lastLogoff": ['0'],
                 "lastLogon": ['0'],
                 "logonCount": ['0'],
-                "mail": [f"{name[0]}.{name[1]}@somedomain.com"],
+                "mail": [f"{name[0]}.{name[1]}@email.com"],
                 "name": [f"TEST {user}"],
                 "objectClass": [
                     'top',
@@ -238,17 +242,8 @@ def generate_test_user_objects(test_users):
 
 def handler(event, context):
     # http://listofrandomnames.com/index.cfm
-    test_users = [
-        "Grace Ogden",
-        "Christopher Morgan",
-        "Theresa Clarkson",
-        "Grace Baker",
-        "Justin Dickens",
-        "Adam Bond",
-        "John Terry",
-        "William Paige",
-        "Stephanie Buckland",
-        "Elizabeth Mathis"
-    ]
+    test_users = json.loads(os.environ['TEST_USERS'])
     users = generate_test_user_objects(test_users)
-    return LdapMaintainer().disable_users(users)
+    ldap_maint = LdapMaintainer()
+    ldap_maint.add_users(users)
+    ldap_maint.disable_random_users(users)

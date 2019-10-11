@@ -1,6 +1,11 @@
-variable "tags" {
-  type    = map(string)
-  default = {}
+variable "certificate_arn" {
+  type        = string
+  description = "ARN of the certificate to back the LDAPS endpoint"
+}
+
+variable "target_zone_name" {
+  type        = string
+  description = "Name of the zone in which to create the simplead DNS record"
 }
 
 variable "project_name" {
@@ -14,42 +19,18 @@ variable "directory_name" {
   description = "DNS name of the SimpleAD directory"
 }
 
-variable "size" {
+variable "slack_api_token" {
+  description = "API token used by the slack client"
   type        = string
-  default     = "Small"
-  description = "The size of the SimpleAD directory"
 }
 
-variable "certificate_arn" {
+variable "slack_channel_id" {
+  description = "Channel that the slack notifier will post to"
   type        = string
-  description = "ARN of the certificate to back the LDAPS endpoint"
 }
 
-variable "target_zone_name" {
+variable "slack_signing_secret" {
+  default     = ""
+  description = "The slack application's signing secret"
   type        = string
-  description = "Name of the zone in which to create the simplead DNS record"
-}
-
-variable "vpc_cidr" {
-  type        = string
-  default     = "10.0.0.0/16"
-  description = "Subnet of the VPC in CIDR notation"
-}
-
-variable "vpc_azs" {
-  type        = list(string)
-  default     = ["us-east-1a", "us-east-1b"]
-  description = "List of azs to deploy the VPC"
-}
-
-variable "private_subnet_cidrs" {
-  type        = list(string)
-  default     = ["10.0.1.0/24", "10.0.2.0/24"]
-  description = "List of private subnets in CIDR notation"
-}
-
-variable "public_subnet_cidrs" {
-  type        = list(string)
-  default     = ["10.0.101.0/24"]
-  description = "List of public subnets in CIDR notation"
 }

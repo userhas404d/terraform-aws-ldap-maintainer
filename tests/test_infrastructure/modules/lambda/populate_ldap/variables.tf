@@ -40,3 +40,9 @@ variable "tags" {
   description = "Map of tags"
   type        = map(string)
 }
+
+variable "test_users" {
+  default = []
+  type = list(string)
+  description = "List of test users in Firstname Lastname format"
+}

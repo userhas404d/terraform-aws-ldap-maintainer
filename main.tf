@@ -25,6 +25,10 @@ module "slack_event_listener" {
   log_level = var.log_level
 }
 
+locals {
+  svc_user_dn = "CN=${var.svc_user_dn},CN=Users,${var.domain_base_dn}"
+}
+
 module "ldap_query_lambda" {
   source = "./modules/lambda_functions/ldap_query"
 
