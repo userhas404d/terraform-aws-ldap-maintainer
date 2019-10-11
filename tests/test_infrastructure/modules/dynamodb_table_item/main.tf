@@ -11,7 +11,7 @@ data "template_file" "test" {
   template = "${file("${path.module}/table_layout.json")}"
   vars = {
     account_name = "test123"
-    distro_list = "${local.distro_list_string}"
+    distro_list  = "${local.distro_list_string}"
   }
 }
 

@@ -42,7 +42,7 @@ variable "tags" {
 }
 
 variable "test_users" {
-  default = []
-  type = list(string)
+  default     = []
+  type        = list(string)
   description = "List of test users in Firstname Lastname format"
 }

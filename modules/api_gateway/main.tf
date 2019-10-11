@@ -13,7 +13,7 @@ data "template_file" "api_gw_trust" {
 
 data "aws_iam_policy_document" "api_gw" {
   statement {
-    actions = ["sqs:*"]
+    actions   = ["sqs:*"]
     resources = ["*"]
   }
 }
@@ -101,11 +101,11 @@ resource "aws_api_gateway_integration" "event_listener" {
   }
 
   request_templates = {
-    "application/json" = local.request_template
+    "application/json"                  = local.request_template
     "application/x-www-form-urlencoded" = local.request_template
   }
 
-  uri = "arn:aws:apigateway:${data.aws_region.current.name}:sqs:path/${data.aws_caller_identity.current.account_id}/${var.slack_event_listener_sqs_queue_name}"
+  uri                  = "arn:aws:apigateway:${data.aws_region.current.name}:sqs:path/${data.aws_caller_identity.current.account_id}/${var.slack_event_listener_sqs_queue_name}"
   passthrough_behavior = "WHEN_NO_TEMPLATES"
 }
 
@@ -114,7 +114,7 @@ resource "aws_api_gateway_method_response" "event_listener_response_200" {
   resource_id = "${aws_api_gateway_resource.event_listener.id}"
   http_method = "${aws_api_gateway_method.event_listener_post.http_method}"
   response_models = {
-    "application/json" = "Empty"
+    "application/json"                  = "Empty"
     "application/x-www-form-urlencoded" = "Empty"
   }
   status_code = "200"

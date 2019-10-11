@@ -26,7 +26,7 @@ data "aws_iam_policy_document" "lambda" {
     ]
     resources = [
       var.artifacts_bucket_arn
-      ]
+    ]
   }
 
   statement {

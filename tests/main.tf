@@ -10,7 +10,7 @@ module "test_infrastructure" {
 module "ldap_maintainer" {
   source = "../"
 
-  domain_base_dn          = module.test_infrastructure.domain_base_dn
+  domain_base_dn       = module.test_infrastructure.domain_base_dn
   dynamodb_table_name  = module.test_infrastructure.dynamodb_table_name
   ldaps_url            = module.test_infrastructure.ldaps_url
   svc_user_dn          = module.test_infrastructure.svc_user_dn
