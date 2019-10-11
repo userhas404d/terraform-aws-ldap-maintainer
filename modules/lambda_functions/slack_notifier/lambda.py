@@ -251,8 +251,8 @@ def get_last_modified():
 
 
 def get_latest_s3_object(
-    bucket=os.environ['ARTIFACT_BUCKET'],
-    prefix='slack_response'
+    bucket=os.environ['ARTIFACTS_BUCKET'],
+    prefix='slack-response'
 ):
     """
     Retrieve the newest object in the target s3 bucket
@@ -266,7 +266,7 @@ def get_latest_s3_object(
 
 def retrieve_s3_object_contents(
     s3_obj,
-    bucket=os.environ['ARTIFACT_BUCKET']
+    bucket=os.environ['ARTIFACTS_BUCKET']
 ):
     return json.loads(s3.get_object(
         Bucket=bucket,
@@ -274,19 +274,28 @@ def retrieve_s3_object_contents(
         )['Body'].read().decode('utf-8'))
 
 
+def get_slack_response():
+    obj = get_latest_s3_object()
+    return retrieve_s3_object_contents(obj)
+
+
 def handler(event, context):
     log.debug(f"Received event: {json.dumps(event)}")
     if event.get('message_to_slack'):
         message = event['message_to_slack']
+        response = get_slack_response()
+        original_blocks = response['message']['blocks']
+        channel_id = response['channel']['id']
+        timestamp = response['message']['ts']
         slack_message = (
             build_slack_response_message(
-                original_blocks=event['event']['message']['blocks'],
+                original_blocks=original_blocks,
                 msg=message
             )
         )
         send_updated_message_to_slack(
-            channel_id=event['event']['channel']['id'],
-            timestamp=event['event']['message']['ts'],
+            channel_id=channel_id,
+            timestamp=timestamp,
             message_blocks=slack_message
         )
     else:

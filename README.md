@@ -6,7 +6,10 @@ A step function to maintain LDAP users via slack.
 
 ## ToDo
 
-- [ ] store initial slack response in s3 so sfn events don't become bloated
+- [ ] move username list to terraform
+- [ ] populate ldap with user emails
+- [ ] run through an end to end test
+- [ ] create screen capture of workflow
 - [ ] conditionally deploy a windows instance into the test simplead env with AD tools installed
 - [ ] s3 objects should be deleted after 30 days
 
@@ -23,6 +26,7 @@ A step function to maintain LDAP users via slack.
 
 ### Done
 
+- [x] store initial slack response in s3 so sfn events don't become bloated
 - [x] LDAP query should be able to send queries and perform actions
 - [x] add user's email to ldap_query's results
 - [x] Add list of hands off accounts to ldap
@@ -34,31 +38,25 @@ A step function to maintain LDAP users via slack.
 
 ## Overview
 
-1. get the users that are going to be disabled
-2. send that list to the next lambda function that will..
-    1. send the list to slack with an approve/deny button
-    2. if approved, take action on users
-    3. if denied, do nothing
+This project deploys a collection of lambda functions, an api endpoint, and a step function that will automate disabling LDAP users via an interactive slack message.
 
 ## Setup
 
 1. Retrieve the LDAPS endpoint of your target AD deployment.
 
-    **Note:** This can be accomplished via SimpleAD by creating an ALB that listens via TLS on port 636 and forwards to your SimpleAD A record
+    **Note:** This can be accomplished via SimpleAD by creating an ALB that listens via TLS on port 636 and forwards requests to your SimpleAD A record. See the associated [AWS blog post](https://aws.amazon.com/blogs/security/how-to-configure-an-ldaps-endpoint-for-simple-ad/) or the tests of this project for a reference architecture.
 
-1. Within your LDAP directory..
-   1. create a new OU called `DisabledUsers`
-   2. Create a user that will be used by the lambda function
-2. Populate an *encrypted* ssm parameter with the user's password
+2. Within your LDAP directory create a user that will be used by the lambda function. This user will need permissions to query LDAP and disable users.
+3. Populate an *encrypted* ssm parameter with this new user's password and use the key value as the input for `svc_user_pwd_ssm_key` variable.
+4. Enable slack events for your slackbot
+   1. got to https://api.slack.com
+   2. find your app
+   3. navigate to Features > Event Subscriptions > Enable Events
+   4. enter the api gateway url created in the previous step
 
-enable slack events for your slackbot
+## Architecture
 
-**Note**: there's a quirk with lambda permissions and the api gateway endpoint associated with the slack-listener function that forces you to create the required lambda permissions _manually_
 
-1. got to https://api.slack.com
-2. find your app
-3. navigate to Features > Event Subscriptions > Enable Events
-4. enter the api gateway url created in the previous step
 
 ## References
 

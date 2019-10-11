@@ -88,7 +88,7 @@ module "lambda" {
       FILTER_PREFIXES    = jsonencode(var.filter_prefixes)
       SSM_KEY            = var.svc_user_pwd_ssm_key
       LOG_LEVEL          = var.log_level
-      ARTIFACT_BUCKET    = var.artifacts_bucket_name
+      ARTIFACTS_BUCKET   = var.artifacts_bucket_name
       HANDS_OFF_ACCOUNTS = jsonencode(local.hands_off_accounts)
     }
   }

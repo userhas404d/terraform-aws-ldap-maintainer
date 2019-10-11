@@ -180,7 +180,7 @@ def put_object(dest_bucket_name, dest_object_name, src_data):
 def s3upload(
     object_content,
     prefix="slack-response",
-    bucket=os.environ['ARTIFACT_BUCKET']
+    bucket=os.environ['ARTIFACTS_BUCKET']
 ):
     timestamp = datetime.now().strftime("%Y-%m-%d-T%H%M%S.%f")
     object_name = f"{prefix}-{timestamp}.json"
@@ -188,7 +188,7 @@ def s3upload(
     put_object(
             bucket,
             object_name,
-            object_content.encode("utf-8"))
+            json.dumps(object_content).encode("utf-8"))
 
 
 def handler(event, context):

@@ -317,7 +317,8 @@ def create_presigned_url(bucket_name, object_name, expiration=3600):
 def upload_artifacts(content):
     presigned_urls = {}
     artifacts = generate_artifacts(content)
-    bucket_name = os.environ['ARTIFACT_BUCKET']
+    log.debug(f"generated artifacts: {artifacts}")
+    bucket_name = os.environ['ARTIFACTS_BUCKET']
     timestamp = datetime.now().strftime("%Y-%m-%d-T%H%M%S.%f")
     for key in artifacts:
         object_name = f"{key}-{timestamp}.json"
@@ -328,6 +329,8 @@ def upload_artifacts(content):
                 artifacts[key].encode("utf-8")):
             presigned_urls[key] = create_presigned_url(
                 bucket_name, object_name)
+        else:
+            log.error('Encountered error when uploading artifact')
     return presigned_urls
 
 
@@ -343,7 +346,7 @@ def get_last_modified():
 
 
 def get_latest_s3_object(
-    bucket=os.environ['ARTIFACT_BUCKET'],
+    bucket=os.environ['ARTIFACTS_BUCKET'],
     prefix='user_expiration_table'
 ):
     """
@@ -358,7 +361,7 @@ def get_latest_s3_object(
 
 def retrieve_s3_object_contents(
     s3_obj,
-    bucket=os.environ['ARTIFACT_BUCKET']
+    bucket=os.environ['ARTIFACTS_BUCKET']
 ):
     return json.loads(s3.get_object(
         Bucket=bucket,

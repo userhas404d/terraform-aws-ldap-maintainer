@@ -91,7 +91,7 @@ resource "aws_s3_bucket_policy" "artifacts" {
             "AWS": [
               "${module.slack_notifier.role_arn}",
               "${module.slack_event_listener.role_arn}",
-              "${module.slack_notifier.role_arn}"
+              "${module.ldap_query_lambda.role_arn}"
               ]
         },
         "Action": [
@@ -176,7 +176,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
       "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
       "Parameters": {
             "FunctionName": "${module.slack_notifier.function_name}",
-            "Payload":{  
+            "Payload":{
                "event.$": "$",
                "token.$": "$$.Task.Token"
             }
@@ -201,8 +201,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
             "FunctionName": "${module.slack_notifier.function_name}",
-            "Payload":{  
-               "event.$": "$",
+            "Payload":{
                "message_to_slack": "The LDAP operation has been disapproved"
             }
       },
@@ -220,7 +219,6 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
     "Parameters": {
       "FunctionName": "${module.slack_notifier.function_name}",
       "Payload": {
-        "event.$": "$",
         "message_to_slack": "The LDAP operation has been approved. I'll notify you when the operation is complete."
       }
     },
