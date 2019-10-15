@@ -6,8 +6,8 @@ A step function to maintain LDAP users via slack.
 
 ## ToDo
 
+- [ ] implement test toggle for disabling users
 - [ ] implement autodocstring across functions
-- [ ] move username list to terraform
 - [ ] populate ldap with user emails
 - [ ] run through an end to end test
 - [ ] create screen capture of workflow
@@ -26,6 +26,7 @@ A step function to maintain LDAP users via slack.
 
 ### Done
 
+- [x] move username list to terraform
 - [x] store initial slack response in s3 so sfn events don't become bloated
 - [x] LDAP query should be able to send queries and perform actions
 - [x] add user's email to ldap_query's results

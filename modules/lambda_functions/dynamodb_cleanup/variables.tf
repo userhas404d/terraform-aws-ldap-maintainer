@@ -20,3 +20,8 @@ variable "dynamodb_table_name" {
   description = "Name of the dynamodb to take actions against"
   type        = string
 }
+
+variable "artifacts_bucket_name" {
+  description = "Name of the artifacts bucket"
+  type        = string
+}

@@ -4,8 +4,11 @@ Slack chat-bot Lambda handler.
 """
 import boto3
 import collections
-import os
+import json
 import logging
+import os
+
+s3 = boto3.client('s3')
 
 DEFAULT_LOG_LEVEL = logging.DEBUG
 LOG_LEVELS = collections.defaultdict(
@@ -82,6 +85,39 @@ def apply_scan_results(updated_scan_results):
             print(f"updated {item['account_name']}")
 
 
+def get_last_modified():
+    return lambda obj: int(obj['LastModified'].strftime('%s'))
+
+
+def get_latest_s3_object(
+    bucket=os.environ['ARTIFACTS_BUCKET'],
+    prefix='slack-response'
+):
+    """
+    Retrieve the newest object in the target s3 bucket
+    """
+    response = s3.list_objects_v2(
+        Bucket=bucket,
+        Prefix=prefix)
+    all = response['Contents']
+    return max(all, key=lambda x: x['LastModified'])
+
+
+def retrieve_s3_object_contents(
+    s3_obj,
+    bucket=os.environ['ARTIFACTS_BUCKET']
+):
+    return json.loads(s3.get_object(
+        Bucket=bucket,
+        Key=s3_obj['Key']
+        )['Body'].read().decode('utf-8'))
+
+
+def get_previous_scan_results():
+    s3_obj = get_latest_s3_object()
+    return retrieve_s3_object_contents(s3_obj)
+
+
 # this should probably be called recursively for all users in the input list
 # otherwise this task will be very 'chatty'
 # https://realpython.com/python-thinking-recursively/
@@ -99,7 +135,8 @@ def remove_users_in_list(users):
 
 def handler(event, context):
     log.debug(f"Received event: {event}")
-    if event.get('users'):
-        # remove_users_in_list(event['users'])
-        return "Success"
-    return "Failed"
+    if event.get('Input'):
+        event = event['Input']
+    if event['action'] == "remove":
+        users = get_previous_scan_results()['120']
+        remove_users_in_list(users)

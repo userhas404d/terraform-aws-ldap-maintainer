@@ -9,6 +9,10 @@ resource "aws_sqs_queue" "slack_listener" {
   tags = var.tags
 }
 
+data "aws_s3_bucket" "artifacts" {
+  bucket = var.artifacts_bucket_name
+}
+
 data "aws_iam_policy_document" "lambda" {
   # need to make this less permissive
   statement {
@@ -25,7 +29,7 @@ data "aws_iam_policy_document" "lambda" {
       "s3:*"
     ]
     resources = [
-      var.artifacts_bucket_arn
+      data.aws_s3_bucket.artifacts.arn
     ]
   }
 

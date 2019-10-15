@@ -5,13 +5,17 @@ resource "random_string" "this" {
   upper   = false
 }
 
+data "aws_s3_bucket" "artifacts" {
+  bucket = var.artifacts_bucket_name
+}
+
 data "aws_iam_policy_document" "lambda" {
   statement {
     sid = "AllowS3Write"
     actions = [
       "s3:*"
     ]
-    resources = [var.artifacts_bucket_arn]
+    resources = [data.aws_s3_bucket.artifacts.arn]
   }
 }
 

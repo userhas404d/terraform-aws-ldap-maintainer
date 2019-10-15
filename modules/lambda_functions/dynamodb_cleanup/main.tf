@@ -8,6 +8,10 @@ data "aws_dynamodb_table" "target" {
   name = var.dynamodb_table_name
 }
 
+data "aws_s3_bucket" "artifacts" {
+  bucket = var.artifacts_bucket_name
+}
+
 data "aws_iam_policy_document" "lambda" {
   # need to make this less permissive
   statement {
@@ -27,6 +31,12 @@ data "aws_iam_policy_document" "lambda" {
     ]
     resources = [data.aws_dynamodb_table.target.arn]
   }
+
+  statement {
+    sid       = "ReadArtifactsBucket"
+    actions   = ["S3:*"]
+    resources = [data.aws_s3_bucket.artifacts.arn]
+  }
 }
 
 module "lambda" {
@@ -42,8 +52,9 @@ module "lambda" {
 
   environment = {
     variables = {
-      DYNAMODB_TABLE = data.aws_dynamodb_table.target.id
-      LOG_LEVEL      = var.log_level
+      DYNAMODB_TABLE   = data.aws_dynamodb_table.target.id
+      LOG_LEVEL        = var.log_level
+      ARTIFACTS_BUCKET = var.artifacts_bucket_name
     }
   }
 

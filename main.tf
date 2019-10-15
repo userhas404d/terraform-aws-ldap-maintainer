@@ -14,7 +14,6 @@ module "slack_event_listener" {
 
   project_name          = var.project_name
   artifacts_bucket_name = aws_s3_bucket.artifacts.id
-  artifacts_bucket_arn  = aws_s3_bucket.artifacts.arn
   slack_api_token       = var.slack_api_token
   slack_signing_secret  = var.slack_signing_secret
   step_function_arns    = list(aws_sfn_state_machine.ldap_maintenance.id)
@@ -34,7 +33,6 @@ module "ldap_query_lambda" {
 
   project_name          = var.project_name
   artifacts_bucket_name = aws_s3_bucket.artifacts.id
-  artifacts_bucket_arn  = aws_s3_bucket.artifacts.arn
   ldaps_url             = var.ldaps_url
   domain_base_dn        = var.domain_base_dn
   filter_prefixes       = var.filter_prefixes
@@ -50,7 +48,6 @@ module "slack_notifier" {
 
   project_name          = var.project_name
   artifacts_bucket_name = aws_s3_bucket.artifacts.id
-  artifacts_bucket_arn  = aws_s3_bucket.artifacts.arn
   slack_channel_id      = var.slack_channel_id
   slack_api_token       = var.slack_api_token
   sfn_activity_arn      = aws_sfn_activity.account_deactivation_approval.id
@@ -62,8 +59,9 @@ module "slack_notifier" {
 module "dynamodb_cleanup" {
   source = "./modules/lambda_functions/dynamodb_cleanup"
 
-  project_name        = var.project_name
-  dynamodb_table_name = var.dynamodb_table_name
+  project_name          = var.project_name
+  dynamodb_table_name   = var.dynamodb_table_name
+  artifacts_bucket_name = aws_s3_bucket.artifacts.id
 
   log_level = var.log_level
 }
@@ -95,7 +93,8 @@ resource "aws_s3_bucket_policy" "artifacts" {
             "AWS": [
               "${module.slack_notifier.role_arn}",
               "${module.slack_event_listener.role_arn}",
-              "${module.ldap_query_lambda.role_arn}"
+              "${module.ldap_query_lambda.role_arn}",
+              "${module.dynamodb_cleanup.role_arn}"
               ]
         },
         "Action": [
@@ -247,7 +246,7 @@ resource "aws_sfn_state_machine" "ldap_maintenance" {
     "Parameters": {
       "FunctionName": "${module.dynamodb_cleanup.function_arn}",
       "Payload": {
-        "event.$": "$"
+        "Input": {"action": "remove"}
       }
     },
     "Next": "send_status_to_slack"
