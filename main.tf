@@ -73,11 +73,41 @@ resource "random_string" "this" {
   upper   = false
 }
 
+locals {
+  object_prefixes = ["user_expiration_table", "slack-response"]
+}
+
 resource "aws_s3_bucket" "artifacts" {
   bucket = "${var.project_name}-artifacts-${random_string.this.result}"
 
   acl  = "private"
   tags = var.tags
+
+  dynamic "lifecycle_rule" {
+    for_each = local.object_prefixes
+    content {
+      id      = lifecycle_rule.value
+      enabled = true
+
+      prefix = lifecycle_rule.value
+
+      transition {
+        days          = 30
+        storage_class = "STANDARD_IA"
+      }
+
+      transition {
+        days          = 60
+        storage_class = "GLACIER"
+      }
+
+      expiration {
+        days = 90
+      }
+    }
+  }
+
+
 }
 
 resource "aws_s3_bucket_policy" "artifacts" {

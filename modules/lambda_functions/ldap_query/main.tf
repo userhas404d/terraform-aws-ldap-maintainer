@@ -58,10 +58,9 @@ resource "aws_lambda_layer_version" "lambda_layer" {
 }
 
 locals {
-  # these shouldn't ever be disabled with the exception of
-  # krbtgt but we're going to err on the safe side and
-  # ignore them anyway..
   default_hands_off = [
+    "Administrator",
+    "Guest",
     "AWS_WorkSpacesAdmin",
     "AWS_WorkMail_Consul",
     "krbtgt"

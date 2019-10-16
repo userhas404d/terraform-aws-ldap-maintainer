@@ -176,7 +176,7 @@ class LdapMaintainer:
 
     def disable_users(self, user_list):
         con = self.connect()
-        date = datetime.now().strftime("%Y-%m-%d-T%H%M%S.%f")
+        date = datetime.now().strftime("%Y-%m-%d-T%H%M")
         d = f"***Disabled {date} by ldapmaintbot***"
         for user_obj in user_list:
             disable_user = [(
@@ -217,10 +217,12 @@ class LdapMaintainer:
             "never": []
         }
         today = datetime.now()
-        for user_obj in self.get_users():
+        users = self.get_users()
+        for user_obj in users:
             try:
-                # log.debug(f'processing user: {user_obj}')
+                log.debug(f'processing user: {user_obj}')
                 ft = user_obj['pwdLastSet'][0]
+                desc = user_obj['description'][0]
                 pwd_last_set = self.filetime_to_dt(ft)
                 days = (today - pwd_last_set).days
                 user = {
@@ -229,8 +231,9 @@ class LdapMaintainer:
                     "dn": user_obj['distinguishedName'][0],
                     "days_since_last_pwd_change": days
                 }
-                # log.debug(f'got user: {user}')
-                if days >= 120:
+                log.debug(f'got user: {user}')
+                # if employeeType is set to DTU assume the user is a test user
+                if days >= 120 or desc == "Test account":
                     stale_users["120"].append(user)
                 elif days >= 90:
                     stale_users["90"].append(user)
@@ -402,5 +405,6 @@ def handler(event, context):
                 }
         elif event['action'] == "disable":
             users = get_previous_scan_results()['120']
-            log.info(f"users to disable: {users}")
-            # LdapMaintainer().disable_users(users)
+            log.info(f"Disabling the following users: {users}")
+            LdapMaintainer().disable_users(users)
+            log.info("Users successfully disabled")

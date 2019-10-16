@@ -4,6 +4,7 @@ import logging
 import os
 import random
 from datetime import datetime
+from time import sleep
 
 import ldap
 import ldap.asyncsearch
@@ -149,6 +150,28 @@ class LdapMaintainer:
             except ldap.ALREADY_EXISTS:
                 continue
 
+    @staticmethod
+    def ldap_retry(func, max_tries=4, sleep_time=2):
+        """ldap retry function with back off timer
+        https://stackoverflow.com/a/33792744/12031185
+
+        Arguments:
+            func {function} -- [input python-ldap function]
+
+        Keyword Arguments:
+            max_tries {int} -- [number of retries] (default: {4})
+            sleep_time {int} -- [(sec)time to next execution] (default: {2})
+
+        Returns:
+            [varies] -- [returns the results of the python-ldap function call]
+        """
+        for _ in range(0, max_tries):
+            try:
+                return func()
+            except ldap.NO_SUCH_OBJECT:
+                sleep(sleep_time)
+                sleep_time *= 2
+
     def disable_random_users(self, user_list):
         con = self.connect()
         date = datetime.now().strftime("%Y-%m-%d-T%H%M")
@@ -164,8 +187,10 @@ class LdapMaintainer:
                 ldap.MOD_REPLACE,
                 'description',
                 [d.encode('utf-8')])]
-            con.modify_s(user_obj['dn'], disable_user)
-            con.modify_s(user_obj['dn'], update_description)
+            self.ldap_retry(
+                lambda: con.modify_s(user_obj['dn'], disable_user))
+            self.ldap_retry(
+                lambda: con.modify_s(user_obj['dn'], update_description))
 
 
 def byte_encode_user_map(input_map):
@@ -233,8 +258,8 @@ def generate_test_user_objects(test_users):
                     'user'
                 ],
                 "sAMAccountName": [f"{name[0]}.{name[1]}"],
-                # Normal Account, don't expire password
-                "userAccountControl": ['66048']
+                # Normal Account, require user to change pwd on next login
+                "userAccountControl": ['512']
             })
         user_list.append(user_obj)
     return user_list

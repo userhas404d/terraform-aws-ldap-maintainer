@@ -91,7 +91,7 @@ def get_last_modified():
 
 def get_latest_s3_object(
     bucket=os.environ['ARTIFACTS_BUCKET'],
-    prefix='slack-response'
+    prefix='user_expiration_table'
 ):
     """
     Retrieve the newest object in the target s3 bucket
@@ -140,3 +140,4 @@ def handler(event, context):
     if event['action'] == "remove":
         users = get_previous_scan_results()['120']
         remove_users_in_list(users)
+        log.info('Successfully removed the stale users from dynamodb')
