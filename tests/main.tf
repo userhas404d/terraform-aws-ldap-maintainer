@@ -1,10 +1,14 @@
 module "test_infrastructure" {
   source = "./test_infrastructure"
 
-  project_name     = var.project_name
-  certificate_arn  = var.certificate_arn
-  target_zone_name = var.target_zone_name
-  directory_name   = var.directory_name
+  project_name                 = var.project_name
+  certificate_arn              = var.certificate_arn
+  target_zone_name             = var.target_zone_name
+  directory_name               = var.directory_name
+  create_windows_instance      = var.create_windows_instance
+  key_pair_name                = var.key_pair_name
+  additional_ips_allow_inbound = var.additional_ips_allow_inbound
+  instance_profile             = var.instance_profile
 }
 
 module "ldap_maintainer" {

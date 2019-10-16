@@ -14,6 +14,10 @@ module "vpc" {
     "Network" = "Private"
   }
 
+  public_subnet_tags = {
+    "Network" = "Public"
+  }
+
   enable_dhcp_options              = true
   dhcp_options_domain_name         = var.directory_name
   dhcp_options_domain_name_servers = tolist(aws_directory_service_directory.test.dns_ip_addresses)
@@ -115,6 +119,23 @@ resource "aws_lb_target_group_attachment" "ldaps_ip" {
   count            = length(var.private_subnet_cidrs)
   target_group_arn = aws_lb_target_group.ldaps.arn
   target_id        = tolist(aws_directory_service_directory.test.dns_ip_addresses)[count.index]
+}
+
+# windows instance to manage AD
+module "win_ad_mgmt" {
+  source = "./modules/windows_domain_member"
+
+  create_windows_instance      = var.create_windows_instance
+  vpc_id                       = module.vpc.vpc_id
+  instance_subnet              = module.vpc.public_subnets[0]
+  key_pair_name                = var.key_pair_name
+  additional_ips_allow_inbound = var.additional_ips_allow_inbound
+  instance_profile             = var.instance_profile
+
+  directoryId    = aws_directory_service_directory.test.id
+  directoryName  = var.directory_name
+  directoryOU    = local.dn
+  dnsIpAddresses = tolist(aws_directory_service_directory.test.dns_ip_addresses)
 }
 
 # lambda function to populate ldap

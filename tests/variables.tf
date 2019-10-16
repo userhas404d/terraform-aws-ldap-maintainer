@@ -34,3 +34,26 @@ variable "slack_signing_secret" {
   description = "The slack application's signing secret"
   type        = string
 }
+
+variable "key_pair_name" {
+  type        = string
+  description = "Name of the keypair to associate with the provisioned instance"
+}
+
+variable "additional_ips_allow_inbound" {
+  type        = list(string)
+  default     = []
+  description = "List of IP addresses in CIDR notation to allow inbound on the provisioned sg"
+}
+
+variable "instance_profile" {
+  type        = string
+  description = "Name of the instance profile to attach to the provisioned instance"
+  default     = ""
+}
+
+variable "create_windows_instance" {
+  type        = bool
+  default     = true
+  description = "Boolean used to control the creation of the windows domain member"
+}

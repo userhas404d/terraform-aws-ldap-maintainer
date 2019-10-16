@@ -6,12 +6,10 @@ A step function to maintain LDAP users via slack.
 
 ## ToDo
 
-- [ ] implement test toggle for disabling users
+- [ ] confirm if the password last changed value can be overridden
 - [ ] implement autodocstring across functions
-- [ ] populate ldap with user emails
 - [ ] run through an end to end test
 - [ ] create screen capture of workflow
-- [ ] conditionally deploy a windows instance into the test simplead env with AD tools installed
 - [ ] s3 objects should be deleted after 30 days
 - [ ] determine how to validate the user
     - get group members from a target security group and check the user's email against them? would require the slack library in slack-listener to query the user's email address
@@ -26,6 +24,8 @@ A step function to maintain LDAP users via slack.
 
 ### Done
 
+- [x] conditionally deploy a windows instance into the test simplead env with AD tools installed
+- [x] populate ldap with user emails
 - [x] move username list to terraform
 - [x] store initial slack response in s3 so sfn events don't become bloated
 - [x] LDAP query should be able to send queries and perform actions
